@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<Robot type="FirstInspires-FTC">
+    <LynxUsbDevice name="Control Hub Portal" serialNumber="(embedded)" parentModuleAddress="173">
+        <LynxModule name="Control Hub" port="173">
+            <goBILDA5202SeriesMotor name="rearLeftMotor" port="0" />
+            <goBILDA5202SeriesMotor name="frontLeftMotor" port="1" />
+            <goBILDA5202SeriesMotor name="frontRightMotor" port="2" />
+            <goBILDA5202SeriesMotor name="rearRightMotor" port="3" />
+            <Servo name="liftPivotServo" port="0" />
+            <ControlHubImuBHI260AP name="imu" port="0" bus="0" />
+        </LynxModule>
+    </LynxUsbDevice>
+    <LynxUsbDevice name="Expansion Hub Portal" serialNumber="(embedded)" parentModuleAddress="173"> <!-- was 173 -->
+        <LynxModule name="Expansion Hub" port="2">
+            <goBILDA5202SeriesMotor name="carWashMotor" port="0" />
+            <RevRoboticsCoreHexMotor name="rightSlideMotor" port="1" />
+            <RevRoboticsCoreHexMotor name="leftSlideMotor" port="2" />
+            <goBILDA5202SeriesMotor name="liftMotor" port="3" />
+            <Servo name="carWashSlideServo" port="0" />
+            <Servo name="carWashPivotServo" port="2" />
+            <Servo name="dumpTruckServo" port="4" />
+            <REV_VL53L0X_RANGE_SENSOR name="slideTofSensor" port="0" bus="3" />
+        </LynxModule>
+    </LynxUsbDevice>
+    <Webcam name="Webcam 1" serialNumber="65B01580" />
+</Robot>
