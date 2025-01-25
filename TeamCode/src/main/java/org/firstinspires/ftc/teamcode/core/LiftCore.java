@@ -32,8 +32,12 @@ public class LiftCore extends ExtensionCore {
     final double CLAW_OPEN_POSITION = 0.6;
     public final double SLIDE_PICKUP_HOOKER_LIFT_ROTATION = 0.4117;
     public final double SLIDE_PICKUP_HOOKER_LIFT_REVERSE_ROTATION = 0.5867;
-        public final double LIFT_ROTATION_PARK = 0.56;
-        public final double LIFT_ROTATION_PARK_REVERSE = 0.43;
+    public final double SLIDE_DROPOFF_HOOKER_LIFT_ROTATION = 0.47;
+    public final double SLIDE_DROPOFF_HOOKER_LIFT_REVERSE_ROTATION = 0.52;
+    public final double SLIDE_DROPOFF_RELEASE_HOOKER_LIFT_ROTATION = 0.40;
+    public final double SLIDE_DROPIFF_RELEASE_HOOKER_LIFT_REVERSE_ROTATION = 0.60;
+    public final double LIFT_ROTATION_PARK = 0.56;
+    public final double LIFT_ROTATION_PARK_REVERSE = 0.43;
 
     @Override
     public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor) throws InterruptedException {
@@ -63,15 +67,15 @@ public class LiftCore extends ExtensionCore {
     }
 
     private void moveToDropoff() throws InterruptedException {
-        liftPivotServoPosition = 0.47;
-        liftPivotServoReversePosition = 0.52;
+        liftPivotServoPosition = SLIDE_DROPOFF_HOOKER_LIFT_ROTATION;
+        liftPivotServoReversePosition = SLIDE_DROPOFF_HOOKER_LIFT_REVERSE_ROTATION;
         liftPivotServo.setPosition(liftPivotServoPosition);
         liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
     }
 
     private void dropoff() throws InterruptedException {
-        liftPivotServoPosition = 0.40;
-        liftPivotServoReversePosition = 0.60;
+        liftPivotServoPosition = SLIDE_DROPOFF_RELEASE_HOOKER_LIFT_ROTATION;
+        liftPivotServoReversePosition = SLIDE_DROPIFF_RELEASE_HOOKER_LIFT_REVERSE_ROTATION;
         liftPivotServo.setPosition(liftPivotServoPosition);
         liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
     }
@@ -84,6 +88,9 @@ public class LiftCore extends ExtensionCore {
     }
 
     private void rotationStateMachine() throws InterruptedException {
+        if (liftPivotServoPosition < SLIDE_DROPOFF_RELEASE_HOOKER_LIFT_ROTATION  || liftPivotServoReversePosition > SLIDE_DROPIFF_RELEASE_HOOKER_LIFT_REVERSE_ROTATION) {
+            slideState = SLIDE_STATE.AUTO_PICKUP;
+        }
         switch (rotationLiftState) {
             case WAITING:
                 break;
