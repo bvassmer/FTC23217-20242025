@@ -8,7 +8,7 @@ public class Enum {
         LEFT,
     };
 
-    public enum Color {
+    public enum TeamColor {
         BLUE,
         RED,
     }

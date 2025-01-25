@@ -1,109 +1,156 @@
 package org.firstinspires.ftc.teamcode.core;
 
+import android.app.WallpaperInfo;
+
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-public class LiftCore extends DroneCore {
-    public enum LiftState {
+import org.firstinspires.ftc.teamcode.Enum;
+import org.firstinspires.ftc.teamcode.library.LinearVelocity;
+
+public class LiftCore extends ExtensionCore {
+    private boolean autonomousMode = false;
+    private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
+    public enum RotationLiftState {
         WAITING,
-        RAISING,
-        AUTO_RAISE,
-        AUTO_LOWER,
-        AUTO_RAISING,
-        AUTO_LOWERING,
-        LOWERING,
-        HOLDING,
+        MOVE_TO_FRONT,
+        MOVE_TO_BACK,
+        MOVE_TO_MAX_FRONT,
+        MOVE_TO_MAX_BACK,
+        MOVE_TO_PICKUP,
+        MOVE_TO_DROPOFF,
+        DROPOFF,
+        PARK,
+        MOVING,
     }
-    public LiftState liftState = LiftState.WAITING;
-    protected ElapsedTime autoLiftTimer = new ElapsedTime();
-    final Double LIFT_TIME = 1.1; // in seconds. equals 0.2s/cycle or 5 Hz.
-    final Double LOWER_TIME = 1.1; // in seconds. equals 0.2s/cycle or 5 Hz.
+    public RotationLiftState rotationLiftState = RotationLiftState.WAITING;
+    protected ElapsedTime rotationTimer = new ElapsedTime();
+    final Double ROTATION_TIME = 0.4; // in seconds. equals 0.2s/cycle or 5 Hz.
+    final Double SAFE_LIFT_ROTATION_FRONT = 0.255;
+    final Double SAFE_LIFT_REVERSE_ROTATION_FRONT = 0.73;
+    final Double SAFE_LIFT_ROTATION_BACK = 0.58;
+    final Double SAFE_LIFT_REVERSE_ROTATION_BACK = 0.41;
+    final double CLAW_OPEN_POSITION = 0.6;
+    public final double SLIDE_PICKUP_HOOKER_LIFT_ROTATION = 0.4117;
+    public final double SLIDE_PICKUP_HOOKER_LIFT_REVERSE_ROTATION = 0.5867;
+        public final double LIFT_ROTATION_PARK = 0.56;
+        public final double LIFT_ROTATION_PARK_REVERSE = 0.43;
 
     @Override
-    public void runOpMode(boolean autonomousMode) throws InterruptedException {
-        super.runOpMode(autonomousMode);
-        lowerHook();
+    public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor) throws InterruptedException {
+        super.runOpMode(autonomousMode, teamColor);
+        this.teamColor = teamColor;
+        this.autonomousMode = autonomousMode;
     }
 
-    protected void workers(boolean enableController) throws InterruptedException {
-        super.workers(enableController);
-        if (enableController) {
-            controllerActions();
-        }
-        stateMachine();
+    protected void workers(boolean enableController, LinearVelocity currentLinearVelocity, double desiredAngularMovement) throws InterruptedException {
+        super.workers(enableController, currentLinearVelocity, desiredAngularMovement);
+        telemetry.addData("Lift Pivot Servo Position", liftPivotServo.getPosition());
+        telemetry.addData("Lift Pivot Servo Reverse Position", liftPivotServoReverse.getPosition());
+        telemetry.addData("Lift Pivot State", rotationLiftState);
+        rotationStateMachine();
+        startTimers();
     }
 
-    private void controllerActions() throws InterruptedException {
-        liftArmMovement();
-        hookMovement();
+    private void startTimers() throws InterruptedException {
+        rotationTimer.startTime();
     }
 
-
-    private void liftArmMovement() throws InterruptedException {
-        boolean up = gamepad1.dpad_up;
-        boolean down = gamepad1.dpad_down;
-        if (up) {
-            liftState = LiftState.RAISING;
-        } else if (down) {
-            liftState = LiftState.LOWERING;
-        } else if (liftState != LiftState.AUTO_LOWERING
-                && liftState != LiftState.AUTO_RAISING
-                && liftState != LiftState.AUTO_RAISE
-                && liftState != LiftState.AUTO_LOWER) {
-            liftState = LiftState.WAITING;
-        }
+    private void moveToPickup() throws InterruptedException {
+        liftPivotServoPosition = SLIDE_PICKUP_HOOKER_LIFT_ROTATION;
+        liftPivotServoReversePosition = SLIDE_PICKUP_HOOKER_LIFT_REVERSE_ROTATION;
+        liftPivotServo.setPosition(liftPivotServoPosition);
+        liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
     }
 
-    private void hookMovement() throws InterruptedException {
-        if (gamepad1.a) {
-            lowerHook();
-        }
-        if (gamepad1.y) {
-            raiseHook();
-        }
+    private void moveToDropoff() throws InterruptedException {
+        liftPivotServoPosition = 0.47;
+        liftPivotServoReversePosition = 0.52;
+        liftPivotServo.setPosition(liftPivotServoPosition);
+        liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
     }
 
-    public void raiseHook() throws InterruptedException {
-        hookServo.setPosition(0.023);
+    private void dropoff() throws InterruptedException {
+        liftPivotServoPosition = 0.40;
+        liftPivotServoReversePosition = 0.60;
+        liftPivotServo.setPosition(liftPivotServoPosition);
+        liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
     }
 
-    public void lowerHook() throws InterruptedException {
-        hookServo.setPosition(0.35);
+    private void park() throws InterruptedException {
+        liftPivotServoPosition = LIFT_ROTATION_PARK;
+        liftPivotServoReversePosition = LIFT_ROTATION_PARK_REVERSE;
+        liftPivotServo.setPosition(liftPivotServoPosition);
+        liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
     }
 
-    private void stateMachine() throws InterruptedException {
-        // Currently updates readings every 0.2 seconds.
-        switch (liftState) {
+    private void rotationStateMachine() throws InterruptedException {
+        switch (rotationLiftState) {
             case WAITING:
-                liftMotor.setPower(0);
                 break;
-            case LOWERING:
-                liftMotor.setPower(-1);
+            case MOVE_TO_MAX_BACK:
+                rotationTimer.reset();
+                liftPivotServoPosition = SAFE_LIFT_ROTATION_BACK;
+                liftPivotServoReversePosition = SAFE_LIFT_REVERSE_ROTATION_BACK;
+                liftPivotServo.setPosition(liftPivotServoPosition);
+                liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
+                rotationLiftState = RotationLiftState.MOVING;
                 break;
-            case RAISING:
-                liftMotor.setPower(1);
+            case MOVE_TO_MAX_FRONT:
+                rotationTimer.reset();
+                liftPivotServoPosition = SAFE_LIFT_ROTATION_FRONT;
+                liftPivotServoReversePosition = SAFE_LIFT_REVERSE_ROTATION_FRONT;
+                liftPivotServo.setPosition(liftPivotServoPosition);
+                liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
+                rotationLiftState = RotationLiftState.MOVING;
                 break;
-            case AUTO_LOWER:
-                autoLiftTimer.reset();
-                liftMotor.setPower(-0.8);
-                liftState = LiftState.AUTO_LOWERING;
-                break;
-            case AUTO_RAISE:
-                autoLiftTimer.reset();
-                liftMotor.setPower(1);
-                liftState = LiftState.AUTO_RAISING;
-                break;
-            case AUTO_LOWERING:
-                if (autoLiftTimer.seconds() > LOWER_TIME) {
-                    liftState = LiftState.WAITING;
+            case MOVE_TO_BACK:
+                rotationTimer.reset();
+                if (liftPivotServoPosition + 0.02 < SAFE_LIFT_ROTATION_BACK) {
+                    // SAFE, so allow movement
+                    liftPivotServoPosition = liftPivotServo.getPosition() + 0.02;
+                    liftPivotServoReversePosition = liftPivotServoReverse.getPosition() - 0.02;
+                    liftPivotServo.setPosition(liftPivotServoPosition);
+                    liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
+                    rotationLiftState = RotationLiftState.MOVING;
+                } else if (liftPivotServoPosition + 0.02 >= SAFE_LIFT_ROTATION_BACK) {
+                    // NOT SAFE, reset to MAX BACK.
+                    rotationLiftState = RotationLiftState.MOVE_TO_MAX_BACK;
                 }
                 break;
-            case AUTO_RAISING:
-                if (autoLiftTimer.seconds() > LIFT_TIME) {
-                    liftState = LiftState.HOLDING;
+            case MOVE_TO_FRONT:
+                rotationTimer.reset();
+                if (liftPivotServoPosition - 0.02 > SAFE_LIFT_ROTATION_FRONT) {
+                    // SAFE, so allow movement
+                    liftPivotServoPosition = liftPivotServo.getPosition() - 0.02;
+                    liftPivotServoReversePosition = liftPivotServoReverse.getPosition() + 0.02;
+                    liftPivotServo.setPosition(liftPivotServoPosition);
+                    liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
+                    rotationLiftState = RotationLiftState.MOVING;
+                } else if (liftPivotServoPosition - 0.02 <= SAFE_LIFT_ROTATION_FRONT) {
+                    // NOT SAFE, so reset to MAX FRONT
+                    rotationLiftState = RotationLiftState.MOVE_TO_MAX_FRONT;
                 }
                 break;
-            case HOLDING:
-               liftMotor.setPower(0.01);
+            case MOVE_TO_PICKUP:
+                moveToPickup();
+                rotationLiftState = RotationLiftState.WAITING;
+               break;
+            case MOVE_TO_DROPOFF:
+                moveToDropoff();
+                rotationLiftState = RotationLiftState.WAITING;
+                break;
+            case DROPOFF:
+                dropoff();
+                rotationLiftState = RotationLiftState.WAITING;
+                break;
+            case MOVING:
+                if (rotationTimer.seconds() > ROTATION_TIME) {
+                    rotationLiftState = RotationLiftState.WAITING;
+                }
+                break;
+            case PARK:
+                park();
+                rotationLiftState = RotationLiftState.WAITING;
                 break;
             default:
                 // shouldn't get here.
