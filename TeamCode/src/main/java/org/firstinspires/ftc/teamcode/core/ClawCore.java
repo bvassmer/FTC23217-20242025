@@ -41,8 +41,8 @@ public class ClawCore extends LiftCore {
         this.autonomousMode = autonomousMode;
     }
 
-    protected void workers(boolean enableController, LinearVelocity currentLinearVelocity, double desiredAngularMovement) throws InterruptedException {
-        super.workers(enableController, currentLinearVelocity, desiredAngularMovement);
+    protected void workers(boolean enableController) throws InterruptedException {
+        super.workers(enableController);
         pivotClawStateMachine();
         clawStateMachine();
     }

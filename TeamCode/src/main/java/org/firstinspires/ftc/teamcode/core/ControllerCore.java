@@ -14,8 +14,8 @@ public class ControllerCore extends ClawCore {
         this.autonomousMode = autonomousMode;
     }
 
-    public void workers(boolean enableController, LinearVelocity currentLinearVelocity, double desiredAngularMovement) throws InterruptedException {
-        super.workers(enableController, currentLinearVelocity, desiredAngularMovement);
+    public void workers(boolean enableController) throws InterruptedException {
+        super.workers(enableController);
         if (enableController) {
             runControllerOne();
             runControllerTwo();

@@ -46,8 +46,8 @@ public class LiftCore extends ExtensionCore {
         this.autonomousMode = autonomousMode;
     }
 
-    protected void workers(boolean enableController, LinearVelocity currentLinearVelocity, double desiredAngularMovement) throws InterruptedException {
-        super.workers(enableController, currentLinearVelocity, desiredAngularMovement);
+    protected void workers(boolean enableController) throws InterruptedException {
+        super.workers(enableController);
         telemetry.addData("Lift Pivot Servo Position", liftPivotServo.getPosition());
         telemetry.addData("Lift Pivot Servo Reverse Position", liftPivotServoReverse.getPosition());
         telemetry.addData("Lift Pivot State", rotationLiftState);
@@ -88,9 +88,6 @@ public class LiftCore extends ExtensionCore {
     }
 
     private void rotationStateMachine() throws InterruptedException {
-        if (liftPivotServoPosition < SLIDE_DROPOFF_RELEASE_HOOKER_LIFT_ROTATION  || liftPivotServoReversePosition > SLIDE_DROPIFF_RELEASE_HOOKER_LIFT_REVERSE_ROTATION) {
-            slideState = SLIDE_STATE.AUTO_PICKUP;
-        }
         switch (rotationLiftState) {
             case WAITING:
                 break;
@@ -151,6 +148,9 @@ public class LiftCore extends ExtensionCore {
                 rotationLiftState = RotationLiftState.WAITING;
                 break;
             case MOVING:
+                if (liftPivotServoPosition != null && (liftPivotServoPosition < SLIDE_DROPOFF_RELEASE_HOOKER_LIFT_ROTATION  || liftPivotServoReversePosition > SLIDE_DROPIFF_RELEASE_HOOKER_LIFT_REVERSE_ROTATION)) {
+                    slideState = SLIDE_STATE.AUTO_PICKUP;
+                }
                 if (rotationTimer.seconds() > ROTATION_TIME) {
                     rotationLiftState = RotationLiftState.WAITING;
                 }

@@ -41,23 +41,23 @@ public class ExtensionCore extends CameraCore {
         this.autonomousMode = autonomousMode;
     }
 
-    protected void workers(boolean enableController, LinearVelocity currentLinearVelocity, double desiredAngularMovement) throws InterruptedException {
-        super.workers(enableController, currentLinearVelocity, desiredAngularMovement);
+    protected void workers(boolean enableController) throws InterruptedException {
+        super.workers(enableController);
         extensionStateMachine();
     }
 
 
     private void moveToDropoff() throws InterruptedException {
-        if (slideTofCB.getAverage() < SLIDE_HOOKER_MIN_SLOW) {
+        if (robotState.slideTofCB.getAverage() < SLIDE_HOOKER_MIN_SLOW) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move up fast ");
             slideMotor.setPower(0.4);
-        } else if (slideTofCB.getAverage() < SLIDE_HOOKER_MIN) {
+        } else if (robotState.slideTofCB.getAverage() < SLIDE_HOOKER_MIN) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move up slow ");
             slideMotor.setPower(0.2);
-        } else if  (slideTofCB.getAverage() > SLIDE_HOOKER_MAX_SLOW ) {
+        } else if  (robotState.slideTofCB.getAverage() > SLIDE_HOOKER_MAX_SLOW ) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move down fast ");
             slideMotor.setPower(-0.3);
-        } else if (slideTofCB.getAverage() > SLIDE_HOOKER_MAX) {
+        } else if (robotState.slideTofCB.getAverage() > SLIDE_HOOKER_MAX) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move down slow ");
             slideMotor.setPower(-0.15);
         } else {
@@ -67,19 +67,19 @@ public class ExtensionCore extends CameraCore {
     }
 
     private void moveToPickup() throws InterruptedException {
-        if (slideTofCB.getAverage() >= SLIDE_PICKUP_HOOKER_MIN && slideTofCB.getAverage() <= SLIDE_PICKUP_HOOKER_MAX) {
+        if (robotState.slideTofCB.getAverage() >= SLIDE_PICKUP_HOOKER_MIN && robotState.slideTofCB.getAverage() <= SLIDE_PICKUP_HOOKER_MAX) {
             // in range
             slideState = SLIDE_STATE.HOLDING;
-        } else if (slideTofCB.getAverage() > SLIDE_PICKUP_SLOW_MAX) {
+        } else if (robotState.slideTofCB.getAverage() > SLIDE_PICKUP_SLOW_MAX) {
             // too high, can move fast down
             slideMotor.setPower(-0.3);
-        } else if (slideTofCB.getAverage() > SLIDE_PICKUP_HOOKER_MAX) {
+        } else if (robotState.slideTofCB.getAverage() > SLIDE_PICKUP_HOOKER_MAX) {
             // too high, in slow zone. move slow down
             slideMotor.setPower(-0.15);
-        } else if (slideTofCB.getAverage() < SLIDE_PICKUP_SLOW_MIN) {
+        } else if (robotState.slideTofCB.getAverage() < SLIDE_PICKUP_SLOW_MIN) {
             // too low, can move fast up
             slideMotor.setPower(0.4);
-        } else if (slideTofCB.getAverage() < SLIDE_PICKUP_HOOKER_MIN) {
+        } else if (robotState.slideTofCB.getAverage() < SLIDE_PICKUP_HOOKER_MIN) {
             // too low, in slow zone. move slow up
             slideMotor.setPower(0.2);
         } else {

@@ -16,15 +16,14 @@ public class TelemetryCore extends ControllerCore {
         this.autonomousMode = autonomousMode;
     }
 
-    public void workers(boolean enableController, LinearVelocity currentLinearVelocity, double desiredAngularMovement) throws InterruptedException {
-        super.workers(enableController, currentLinearVelocity, desiredAngularMovement);
+    public void workers(boolean enableController) throws InterruptedException {
+        super.workers(enableController);
         outputTelemetry(enableController);
     }
 
     public void outputTelemetry(boolean enableController) throws InterruptedException {
         telemetry.addData("Auto mode", autonomousMode);
         telemetry.addData("Enable Controller", enableController);
-        telemetry.addData("Slide distance (mm) ", slideTofCB.getAverage());
         telemetry.addData("liftPivotServo Position", liftPivotServoPosition);
         telemetry.addData("liftPivotServoReverse Position", liftPivotServoReversePosition);
         telemetry.addData("clawPivotServoPosition Position", clawPivotServoPosition);

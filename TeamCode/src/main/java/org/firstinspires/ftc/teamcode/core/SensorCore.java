@@ -9,13 +9,8 @@ import org.firstinspires.ftc.teamcode.library.LinearVelocity;
 
 import java.util.ArrayList;
 
-public class SensorCore extends HardwareCore {
-    private boolean autonomousMode = false;
+public class SensorCore extends OdometryCore {
     private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
-    public DoubleCircularBuffer slideTofCB = new DoubleCircularBuffer(8, true, false);
-    public ArrayList<Short> slideTofDistanceList = new ArrayList<>();
-    protected LinearVelocity currentLinearVelocity;
-    protected double desiredAngularMovement;
 
     public enum SensorState {
         REQUEST_READING,
@@ -29,15 +24,11 @@ public class SensorCore extends HardwareCore {
     SensorState ultraSonicSensorState = SensorState.REQUEST_READING;
 
     public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor) throws InterruptedException {
-        super.runOpMode();
+        super.runOpMode(autonomousMode);
         this.teamColor = teamColor;
-        this.autonomousMode = autonomousMode;
-        // startTofSensors();
     }
 
-    protected void workers(boolean enableController, LinearVelocity currentLinearVelocity, double desiredAngularMovement) throws InterruptedException {
-        this.currentLinearVelocity = currentLinearVelocity;
-        this.desiredAngularMovement = desiredAngularMovement;
+    protected void workers(boolean enableController) throws InterruptedException {
         processTofSensorDistances();
     }
 
@@ -46,7 +37,7 @@ public class SensorCore extends HardwareCore {
     private void processTofSensorDistances() {
         short slideTofDistanceRaw = (short)slideTofSensor.getDistance(DistanceUnit.MM);
         if (slideTofDistanceRaw < TOF_MAX_DISTANCE && slideTofDistanceRaw > TOF_MIN_DISTANCE) {
-            slideTofCB.addAndCalculate((double)slideTofDistanceRaw, 0);
+            robotState.slideTofCB.addAndCalculate((double)slideTofDistanceRaw, 0);
         }
     }
 }

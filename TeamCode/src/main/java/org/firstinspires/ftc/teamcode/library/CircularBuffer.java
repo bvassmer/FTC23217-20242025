@@ -40,11 +40,17 @@ public class CircularBuffer<T> {
     }
 
     // Returns the oldest element without removing it
-    public T peek() {
+    public T oldestPeek() {
         if (size == 0) {
             throw new IllegalStateException("Buffer is empty");
         }
         return buffer[head];
+    }
+    public T newestPeek() {
+        if (size == 0) {
+            throw new IllegalStateException("Buffer is empty");
+        }
+        return buffer[size - 1];
     }
 
     // Returns the current size of the buffer

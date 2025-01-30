@@ -5,7 +5,7 @@ public class OdometryCore extends HardwareCore {
     public int previousXOdoPosition, previousYRightOdoPosition;
 
     public void runOpMode(boolean autonomousMode) throws InterruptedException {
-        super.runOpMode();
+        super.runOpMode(autonomousMode);
     }
 
     protected void workers(boolean enableController) throws InterruptedException {
@@ -16,8 +16,8 @@ public class OdometryCore extends HardwareCore {
     public void updateOdometry() throws InterruptedException {
         previousXOdoPosition = xOdoPosition;
         previousYRightOdoPosition = yOdoPosition;
-        xOdoPosition = rearLeftMotor.getCurrentPosition();
-        yOdoPosition = rearRightMotor.getCurrentPosition();
+        /* xOdoPosition = rearLeftMotor.getCurrentPosition();
+        yOdoPosition = rearRightMotor.getCurrentPosition(); */
     }
 
     public void updateIsMoving() throws InterruptedException {
@@ -25,9 +25,9 @@ public class OdometryCore extends HardwareCore {
         int xDiff = Math.abs(xOdoPosition - previousXOdoPosition);
         int yDiff = Math.abs(yOdoPosition - previousYRightOdoPosition);
         if (xDiff > allowedDiff || yDiff > allowedDiff ) {
-            robotIsMoving = true;
+            robotState.isMoving = true;
         } else {
-            robotIsMoving = false;
+            robotState.isMoving = false;
         }
     }
 }

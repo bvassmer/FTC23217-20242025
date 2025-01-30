@@ -31,11 +31,8 @@ public class AutoDriveCore extends MechamCore {
     private final Pose2D POSE_MOVE_TO_PUSH_TWO = new Pose2D(DistanceUnit.INCH, 120, 72, AngleUnit.DEGREES, 0);
     private final Pose2D POSE_MOVE_TO_PUSH_THREE = new Pose2D(DistanceUnit.INCH, 130, 72, AngleUnit.DEGREES, 180);
     private LinearVelocity currentLinearVelocity = new LinearVelocity(0.0, 0.0);
-    private PoseCircularBuffer previousPoses = new PoseCircularBuffer(POSE_QUEUE_SIZE);
-    private Pose2D currentPose;
     private Pose2D currentDestination;
     private double desiredMovementBearing;
-    private double desiredAngularMovement;
     private double desiredXPower = 0.0;
     private double desiredYPower = 0.0;
     private double desiredRxPower = 0.0;
@@ -57,7 +54,7 @@ public class AutoDriveCore extends MechamCore {
 
     public void workers(boolean enableController, boolean debugMode) throws InterruptedException {
         this.debugMode = debugMode;
-        super.workers(enableController, desiredXPower, desiredYPower, desiredRxPower, currentLinearVelocity, desiredAngularMovement, debugMode);
+        super.workers(enableController, desiredXPower, desiredYPower, desiredRxPower, debugMode);
         if (this.autonomousMode) {
             autoDriveStateMachine();
             telemetryOutput();
@@ -69,7 +66,6 @@ public class AutoDriveCore extends MechamCore {
         telemetry.addData("AutoDriveCode: autonomousMode", autonomousMode);
         telemetry.addData("AutoDriveCode: AutoDriveState: ", autoDriveState);
         telemetry.addData("AutoDriveCode: StepState: ", stepState);
-        telemetry.addData("AutoDriveCore: Linear Velocity: ", currentLinearVelocity.toString());
         telemetry.addData("AutoDriveCore: Desired Movement Bearing:" , desiredMovementBearing);
         telemetry.addData("AutoDriveCore: desiredXPower: ", desiredXPower);
         telemetry.addData("AutoDriveCore: desiredYPower: ", desiredYPower);
@@ -77,22 +73,11 @@ public class AutoDriveCore extends MechamCore {
     }
 
     private void updatePreviousPoses(boolean move) throws  InterruptedException {
-        currentPose = new Pose2D(
-                DistanceUnit.INCH,
-                currentCameraCenter.x,
-                currentCameraCenter.y,
-                AngleUnit.DEGREES,
-                currentBearingCB.getAverage()
-        );
-        previousPoses.addAndCalculate(
-            currentPose
-        );
-        this.currentLinearVelocity = new LinearVelocity(previousPoses.getAverageSpeed(), previousPoses.getAverageBearing());
     }
 
     private void calculateMovementBearing() throws InterruptedException {
-        double x1 = currentPose.getX(DistanceUnit.INCH);
-        double y1 = currentPose.getY(DistanceUnit.INCH);
+        double x1 = robotState.cameraPoses.getLatestX();
+        double y1 = robotState.cameraPoses.getLatestY();
         double x2 = currentDestination.getX(DistanceUnit.INCH);
         double y2 = currentDestination.getY(DistanceUnit.INCH);
 
@@ -117,8 +102,8 @@ public class AutoDriveCore extends MechamCore {
         if (aprilTagDetected()) {
             // Convert bearing from degrees to radians
             double radians = Math.toRadians(desiredMovementBearing);
-            double x1 = currentPose.getX(DistanceUnit.INCH);
-            double y1 = currentPose.getY(DistanceUnit.INCH);
+            double x1 = robotState.cameraPoses.getLatestX();
+            double y1 = robotState.cameraPoses.getLatestY();
             double x2 = currentDestination.getX(DistanceUnit.INCH);
             double y2 = currentDestination.getY(DistanceUnit.INCH);
 
@@ -144,7 +129,6 @@ public class AutoDriveCore extends MechamCore {
                 desiredSpeed = 0.0;
             }
 
-            desiredAngularMovement = desiredSpeed;
 
             // Calculate x and y components of speed
             double xSpeed = desiredSpeed * Math.sin(radians);  // x component (horizontal speed)
@@ -161,7 +145,8 @@ public class AutoDriveCore extends MechamCore {
 
     private void calculateAngularMovement() throws InterruptedException {
         if (aprilTagDetected()) {
-            double currentAngularBearing = currentPose.getHeading(AngleUnit.DEGREES);
+            // TODO: This is no longer using an average of bearings. Need to make sure it still works.
+            double currentAngularBearing = robotState.cameraPoses.getLatestHeading();
             double currentDesiredAngularBearing = currentDestination.getHeading(AngleUnit.DEGREES);
 
             // Normalize the angles to be within [0, 360)
@@ -218,35 +203,29 @@ public class AutoDriveCore extends MechamCore {
     }
 
     private boolean isAngleGood() throws InterruptedException {
+        // TODO: This is no longer using an average of bearings. Need to make sure it still works.
         return isWithinBufferDifference(
-                currentPose.getHeading(AngleUnit.DEGREES),
+                robotState.cameraPoses.getLatestHeading(),
                 currentDestination.getHeading(AngleUnit.DEGREES),
                 6);
     }
     private boolean isDistanceGood() throws InterruptedException {
+        // TODO: This is no longer using an average of x and y. Need to make sure it still works.
         return isWithinBufferDistance(
-                    currentPose.getX(DistanceUnit.INCH),
-                    currentPose.getY(DistanceUnit.INCH),
+                    robotState.cameraPoses.getLatestX(),
+                    robotState.cameraPoses.getLatestY(),
                     currentDestination.getX(DistanceUnit.INCH),
                     currentDestination.getY(DistanceUnit.INCH),
                    4);
     }
 
-    private void calculateMovementsWithHuskyLens() throws InterruptedException {
-        // use calulateAngularMovement to keep at desired bearing (180 for this situation)
-
-        // use huskylens object information to move left / right until object is centered
-
-        // use huskylens object information to move forward until object is correct size.
-
-    }
-
     private void calculateMovements(boolean canDirection, boolean canRotate) throws InterruptedException {
         if (!atDestination()) {
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Moving");
-            Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currentX" + currentPose.getX(DistanceUnit.INCH) + " currentY:" + currentPose.getY(DistanceUnit.INCH));
+            Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currentX" + robotState.cameraPoses.getLatestX() + " currentY:" + robotState.cameraPoses.getLatestY());
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: destX" + currentDestination.getX(DistanceUnit.INCH) + " destY:" + currentDestination.getY(DistanceUnit.INCH));
-            Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currHeading" + currentPose.getHeading(AngleUnit.DEGREES));
+            // TODO: This is no longer using an average of bearings. Need to make sure it still works.
+            Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currHeading" + robotState.cameraPoses.getLatestHeading());
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: destHeading" + currentDestination.getHeading(AngleUnit.DEGREES));
 
             if (isDistanceGood()) {
@@ -263,6 +242,7 @@ public class AutoDriveCore extends MechamCore {
             }
 
             if (isAngleGood()) {
+                // TODO: This is no longer using an average of bearings. Need to make sure it still works.
                 Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Angle is good. Stopping rotation.");
                 stopMoving(false, true);
             } else {

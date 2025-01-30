@@ -10,6 +10,7 @@ public class MechamCore extends TelemetryCore {
     private boolean debugMode = false;
     private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
     private Double powerReduction = 0.4;
+    public boolean isMoving = false;
 
     @Override
     public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor) throws InterruptedException {
@@ -19,9 +20,9 @@ public class MechamCore extends TelemetryCore {
         this.autonomousMode = autonomousMode;
     }
 
-    public void workers(boolean enableController, double x, double y, double rx, LinearVelocity currentLinearVelocity, double desiredAngularMovement, boolean debugMode) throws InterruptedException {
+    public void workers(boolean enableController, double x, double y, double rx, boolean debugMode) throws InterruptedException {
         this.debugMode = debugMode;
-        super.workers(enableController, currentLinearVelocity, desiredAngularMovement);
+        super.workers(enableController);
         if (autonomousMode) {
             autoMechamMovement(x, y, rx);
         }
@@ -47,8 +48,13 @@ public class MechamCore extends TelemetryCore {
         // but only if at least one is out of the range [-1, 1]
         double denominator = Math.max(Math.abs(fixedY) + Math.abs(fixedX) + Math.abs(fixedRx), 1);
 
+        if (y != 0 || x != 0 || rx != 0) {
+            isMoving = true;
+        } else {
+            isMoving = false;
+        }
         // power reducer is in place to help us learn how to drive. can be adjusted as needed.
-        Log.d("FTC-23217-autoMechamMovement", "x:" + fixedX + " y:" + fixedY + " rx:" + fixedRx);
+        Log.d("FTC-23217-autoMechamMovement", "isMoving:" + isMoving + " x:" + fixedX + " y:" + fixedY + " rx:" + fixedRx);
 
         double frontLeftPower = -(fixedY + fixedX + fixedRx) / denominator;
         double rearLeftPower = (fixedY - fixedX + fixedRx) / denominator;
@@ -76,19 +82,18 @@ public class MechamCore extends TelemetryCore {
         } else {
             powerReduction = 0.4;
         }
-        Log.d("FTC-23217-mechamMovement", "x:" + x + " y:" + y + " rx:" + rx + " rt:" + rt);
 
-        // modified code where right motors are reversed.
-        /* double y = gamepad1.left_stick_y; // Remember, Y stick value is reversed
-        double x = -gamepad1.left_stick_x * 1.1; // Counteract imperfect strafing
-        double rx = -gamepad1.right_stick_x * right_stick_x_reducer; */
+        if (y != 0 || x != 0 || rx != 0) {
+            isMoving = true;
+        } else {
+            isMoving = false;
+        }
+        Log.d("FTC-23217-mechamMovement", "isMoving:" + isMoving + " x:" + x + " y:" + y + " rx:" + rx + " rt:" + rt);
 
         // Denominator is the largest motor power (absolute value) or 1
         // This ensures all the powers maintain the same ratio,
         // but only if at least one is out of the range [-1, 1]
         double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
-
-        // power reducer is in place to help us learn how to drive. can be adjusted as needed.
 
         double frontLeftPower = powerCurve(-(y + x + rx) / denominator);
         double rearLeftPower = powerCurve((y - x + rx) / denominator);
