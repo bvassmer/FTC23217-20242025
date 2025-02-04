@@ -15,9 +15,7 @@ import org.opencv.core.Mat;
 
 
 public class AutoDriveCore extends MechamCore {
-    private boolean autonomousMode = false;
     private boolean debugMode = false;
-    private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
     private final int POSE_QUEUE_SIZE = 8;
     private final Pose2D POSE_DROPOFF_RED = new Pose2D(DistanceUnit.INCH, 74, 42, AngleUnit.DEGREES, 0);
     private final Pose2D POSE_DROPOFF_ATTACH_RED = new Pose2D(DistanceUnit.INCH, 74, 43, AngleUnit.DEGREES, 0);
@@ -44,12 +42,26 @@ public class AutoDriveCore extends MechamCore {
     public AutoDriveState autoDriveState = AutoDriveState.WAITING;
     public StepState stepState = StepState.START;
 
-    public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor, AutoDriveState startMode) throws InterruptedException {
+
+    // Center of course is 0, 0
+
+    // X can be -72 to 72 in inches (144 inches or ~3580 mm across)
+    // X is positive away from the audience. X is positive to the right direction looking from the Red Alliance. X is positive to the left direction looking from the Blue Alliance.
+    // X is negative toward teh audience. X is negative to the left direction looking from the Red Alliance. X is negative to the right direction looking from the Blue Alliance.
+
+    // Y can be -72 to 72 in inches (144 inches or ~3580 mm across)
+    // Y is positive on the Blue Alliance side of the course.
+    // Y is negative on the Red Alliance side of the course.
+
+    // each tile is about 24 in x 24 in
+    // robot size is max 18 in x 18 in
+    private final Pose2D RED_RIGHT_START_POSE = new Pose2D(DistanceUnit.INCH, 24, -54, AngleUnit.DEGREES, 0);
+    private final Pose2D RED_RIGHT_DROPOFF_POSE = new Pose2D(DistanceUnit.INCH, 3, -32, AngleUnit.DEGREES, 0);
+
+    public void runOpMode(AutoDriveState startMode) throws InterruptedException {
         Log.d("FTC-23217-AutoDriveCore", "AutoDriveCore Start. Color:" + teamColor);
         autoDriveState = startMode;
-        super.runOpMode(autonomousMode, teamColor);
-        this.teamColor = teamColor;
-        this.autonomousMode = autonomousMode;
+        super.runOpMode();
     }
 
     public void workers(boolean enableController, boolean debugMode) throws InterruptedException {
@@ -76,8 +88,8 @@ public class AutoDriveCore extends MechamCore {
     }
 
     private void calculateMovementBearing() throws InterruptedException {
-        double x1 = robotState.cameraPoses.getLatestX();
-        double y1 = robotState.cameraPoses.getLatestY();
+        double x1 = odoPoses.getLatestX();
+        double y1 = odoPoses.getLatestY();
         double x2 = currentDestination.getX(DistanceUnit.INCH);
         double y2 = currentDestination.getY(DistanceUnit.INCH);
 
@@ -102,29 +114,29 @@ public class AutoDriveCore extends MechamCore {
         if (aprilTagDetected()) {
             // Convert bearing from degrees to radians
             double radians = Math.toRadians(desiredMovementBearing);
-            double x1 = robotState.cameraPoses.getLatestX();
-            double y1 = robotState.cameraPoses.getLatestY();
+            double x1 = odoPoses.getLatestX();
+            double y1 = odoPoses.getLatestY();
             double x2 = currentDestination.getX(DistanceUnit.INCH);
             double y2 = currentDestination.getY(DistanceUnit.INCH);
 
 
-            boolean withIn5 = isWithinBufferDistance(x1, y1, x2, y2, 5);
-            boolean withIn10 = isWithinBufferDistance(x1, y1, x2, y2, 10);
-            boolean withIn20 = isWithinBufferDistance(x1, y1, x2, y2, 20);
-            boolean withIn40 = isWithinBufferDistance(x1, y1, x2, y2, 40);
-            boolean withIn100 = isWithinBufferDistance(x1, y1, x2, y2, 100);
+            boolean withIn5 = isXYWithinBuffer(x1, y1, x2, y2, 5);
+            boolean withIn10 = isXYWithinBuffer(x1, y1, x2, y2, 10);
+            boolean withIn20 = isXYWithinBuffer(x1, y1, x2, y2, 20);
+            boolean withIn40 = isXYWithinBuffer(x1, y1, x2, y2, 40);
+            boolean withIn100 = isXYWithinBuffer(x1, y1, x2, y2, 100);
             double desiredSpeed = 0.0;
 
             if (withIn5) {
                 desiredSpeed = 0.2;
             } else if (withIn10) {
-                desiredSpeed = 0.2;
+                desiredSpeed = 0.3;
             } else if (withIn20) {
-                desiredSpeed = 0.2;
+                desiredSpeed = 0.4;
             } else if (withIn40) {
-                desiredSpeed = 0.25;
+                desiredSpeed = 0.5;
             } else if (withIn100) {
-                desiredSpeed = 0.25;
+                desiredSpeed = 0.6;
             } else {
                 desiredSpeed = 0.0;
             }
@@ -146,7 +158,7 @@ public class AutoDriveCore extends MechamCore {
     private void calculateAngularMovement() throws InterruptedException {
         if (aprilTagDetected()) {
             // TODO: This is no longer using an average of bearings. Need to make sure it still works.
-            double currentAngularBearing = robotState.cameraPoses.getLatestHeading();
+            double currentAngularBearing = odoPoses.getLatestHeading();
             double currentDesiredAngularBearing = currentDestination.getHeading(AngleUnit.DEGREES);
 
             // Normalize the angles to be within [0, 360)
@@ -168,13 +180,13 @@ public class AutoDriveCore extends MechamCore {
 
             // String direction = delta > 0 ? "right" : "left";
             if (delta > 20) {
-                desiredRxPower = 0.3;
+                desiredRxPower = 0.4;
             } else if (delta > 3) {
-                desiredRxPower = 0.15;
+                desiredRxPower = 0.2;
             } else if (delta < -20) {
-                desiredRxPower = -0.3;
+                desiredRxPower = -0.4;
             } else if (delta < -3) {
-                desiredRxPower = -0.15;
+                desiredRxPower = -0.2;
             } else {
                 desiredRxPower = 0.0;
             }
@@ -192,28 +204,40 @@ public class AutoDriveCore extends MechamCore {
         return false;
     }
 
-    private boolean isWithinBufferDistance(double x1, double y1, double x2, double y2, double buffer) throws InterruptedException {
+    private boolean isXYWithinBuffer(double x1, double y1, double x2, double y2, double buffer) throws InterruptedException {
         double distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
         return distance <= buffer;
     }
 
-    private boolean isWithinBufferDifference(double x1, double x2, double buffer) throws InterruptedException {
-        double difference = Math.abs(x2 - x1);
-        return difference <= buffer;
+    private boolean isHeadingWithinBuffer(double headingToCheck, double targetHeading, double buffer) throws InterruptedException {
+        // Normalize all angles to be between 0 and 360 degrees
+        headingToCheck = (headingToCheck + 360) % 360;
+        targetHeading = (targetHeading + 360) % 360;
+
+        // Calculate the lower and upper bounds of the range
+        double lowerBound = (targetHeading - buffer + 360) % 360;
+        double upperBound = (targetHeading + buffer) % 360;
+
+        // Check if the number is within the range
+        if (lowerBound <= upperBound) {
+            // Normal range (no wraparound)
+            return headingToCheck >= lowerBound && headingToCheck <= upperBound;
+        } else {
+            // Range wraps around 360
+            return headingToCheck >= lowerBound || headingToCheck <= upperBound;
+        }
     }
 
     private boolean isAngleGood() throws InterruptedException {
-        // TODO: This is no longer using an average of bearings. Need to make sure it still works.
-        return isWithinBufferDifference(
-                robotState.cameraPoses.getLatestHeading(),
+        return isHeadingWithinBuffer(
+                odoPoses.getLatestHeading(),
                 currentDestination.getHeading(AngleUnit.DEGREES),
                 6);
     }
     private boolean isDistanceGood() throws InterruptedException {
-        // TODO: This is no longer using an average of x and y. Need to make sure it still works.
-        return isWithinBufferDistance(
-                    robotState.cameraPoses.getLatestX(),
-                    robotState.cameraPoses.getLatestY(),
+        return isXYWithinBuffer(
+                    odoPoses.getLatestX(),
+                    odoPoses.getLatestY(),
                     currentDestination.getX(DistanceUnit.INCH),
                     currentDestination.getY(DistanceUnit.INCH),
                    4);
@@ -222,10 +246,9 @@ public class AutoDriveCore extends MechamCore {
     private void calculateMovements(boolean canDirection, boolean canRotate) throws InterruptedException {
         if (!atDestination()) {
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Moving");
-            Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currentX" + robotState.cameraPoses.getLatestX() + " currentY:" + robotState.cameraPoses.getLatestY());
+            Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currentX (odo)" + odoPoses.getLatestX() + " currentY:" + odoPoses.getLatestY());
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: destX" + currentDestination.getX(DistanceUnit.INCH) + " destY:" + currentDestination.getY(DistanceUnit.INCH));
-            // TODO: This is no longer using an average of bearings. Need to make sure it still works.
-            Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currHeading" + robotState.cameraPoses.getLatestHeading());
+            Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currHeading (odo)" + odoPoses.getLatestHeading());
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: destHeading" + currentDestination.getHeading(AngleUnit.DEGREES));
 
             if (isDistanceGood()) {
@@ -242,7 +265,6 @@ public class AutoDriveCore extends MechamCore {
             }
 
             if (isAngleGood()) {
-                // TODO: This is no longer using an average of bearings. Need to make sure it still works.
                 Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Angle is good. Stopping rotation.");
                 stopMoving(false, true);
             } else {

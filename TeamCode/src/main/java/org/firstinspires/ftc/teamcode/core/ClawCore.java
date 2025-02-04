@@ -6,9 +6,6 @@ import org.firstinspires.ftc.teamcode.Enum;
 import org.firstinspires.ftc.teamcode.library.LinearVelocity;
 
 public class ClawCore extends LiftCore {
-    private boolean autonomousMode = false;
-    private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
-
     public enum ClawPivotState {
         WAITING,
         MOVE_UP,
@@ -35,10 +32,8 @@ public class ClawCore extends LiftCore {
     final double CLAW_PICKUP_POSITION = 0.29;
 
     @Override
-    public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor) throws InterruptedException {
-        super.runOpMode(autonomousMode, teamColor);
-        this.teamColor = teamColor;
-        this.autonomousMode = autonomousMode;
+    public void runOpMode() throws InterruptedException {
+        super.runOpMode();
     }
 
     protected void workers(boolean enableController) throws InterruptedException {

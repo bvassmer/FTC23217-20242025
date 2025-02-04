@@ -27,8 +27,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class CameraCore extends SensorCore {
-    private boolean autonomousMode = false;
-    private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
     public enum SearchState {
         INITIALIZE,
         WAITING_FOR_START,
@@ -45,13 +43,14 @@ public class CameraCore extends SensorCore {
     final static double SEARCH_WAIT_TIME = 0.2; // in seconds. equals 0.2s/cycle or 5 Hz.
     final static double CENTER_WAIT_TIME = 0.2; // in seconds. equals 0.2s/cycle or 5 Hz.
     final static double WEBCAM_SEARCH_STEP = 0.1;
-    final static double ANGLE_MIN = -85.0;
-    final static double ANGLE_MAX = 190.0;
+    final static double ANGLE_MIN = -105.0;
+    final static double ANGLE_MAX = 165.0;
     final static double ANGLE_DIFF = ANGLE_MAX - ANGLE_MIN;
     final static double WEBCAM_SERVO_MIN = 0.0;
     final static double WEBCAM_SERVO_MAX = 1.0;
     final static double SPECIMEN_DROPOFF_BEARING = 0.0;
     final static double SPECIMEN_PICKUP_BEARING = 180.0;
+    private SearchState previousSearchState = SearchState.SEARCHING_RIGHT;
 
     // location of each april tag on the course grid.
     // X,Y origin is corner to the left of the starting position of robot
@@ -64,13 +63,29 @@ public class CameraCore extends SensorCore {
     // Tag ID 14 - (0, 120)
     // Tag ID 15 - (72, 144)
     // Tag ID 16 - (144, 120)
-    final static List<AprilTagLocation> blueAprilTagPoses = new ArrayList<>(Arrays.asList(
+    /* final static List<AprilTagLocation> blueAprilTagPoses = new ArrayList<>(Arrays.asList(
         new AprilTagLocation(13, 0, 24, 270), // 0
         new AprilTagLocation(12, 72, 0, 180), // 180
         new AprilTagLocation(11, 144, 24, 90),  // 90
         new AprilTagLocation(14, 0, 120, 270), // 270
         new AprilTagLocation(15, 72, 144, 0), // 270
         new AprilTagLocation(16, 144, 120, 90) // 90
+    )); */
+    /* final static List<AprilTagLocation> blueAprilTagPoses = new ArrayList<>(Arrays.asList(
+            new AprilTagLocation(13, 72, 48, 270), // 0
+            new AprilTagLocation(12, 0, 72, 180), // 180
+            new AprilTagLocation(11, -72, 48, 90),  // 90
+            new AprilTagLocation(14, 72, -48, 270), // 270
+            new AprilTagLocation(15, 0, -72, 0), // 270
+            new AprilTagLocation(16, -72, -48, 90) // 90
+    )); */
+    final static List<AprilTagLocation> blueAprilTagPoses = new ArrayList<>(Arrays.asList(
+            new AprilTagLocation(16, -72, 48, 270), // 270
+            new AprilTagLocation(15, 0, -72, 180), // 180
+            new AprilTagLocation(14, 72, -48, 90), // 90
+            new AprilTagLocation(11, -72, 48, 270), // 270
+            new AprilTagLocation(12, 0, 72, 0), // 0
+            new AprilTagLocation(13, 72, 48, 90) // 90
     ));
 
     // Red
@@ -80,13 +95,21 @@ public class CameraCore extends SensorCore {
     // Tag ID 11 - (0, 120)
     // Tag ID 12 - (72, 144)
     // Tag IG 13 - (144, 120)
-    final static List<AprilTagLocation> redAprilTagPoses = new ArrayList<>(Arrays.asList(
+    /* final static List<AprilTagLocation> redAprilTagPoses = new ArrayList<>(Arrays.asList(
         new AprilTagLocation(16, 0, 24, 270), // 270
         new AprilTagLocation(15, 72, 0, 180), // 180
         new AprilTagLocation(14, 144, 24, 90), // 90
         new AprilTagLocation(11, 0, 120, 270), // 270
         new AprilTagLocation(12, 72, 144, 0), // 0
         new AprilTagLocation(13, 144, 120, 90) // 90
+    )); */
+    final static List<AprilTagLocation> redAprilTagPoses = new ArrayList<>(Arrays.asList(
+            new AprilTagLocation(16, -72, 48, 270), // 270
+            new AprilTagLocation(15, 0, -72, 180), // 180
+            new AprilTagLocation(14, 72, -48, 90), // 90
+            new AprilTagLocation(11, -72, 48, 270), // 270
+            new AprilTagLocation(12, 0, 72, 0), // 0
+            new AprilTagLocation(13, 72, 48, 90) // 90
     ));
 
     public RobotBounds currentRobotBounds = new RobotBounds(
@@ -95,18 +118,19 @@ public class CameraCore extends SensorCore {
             new Coordinate(0, 0),
             new Coordinate(18, 0)
     );
-    public DoubleCircularBuffer currentRangeCB = new DoubleCircularBuffer(8, true, false);
-    public DoubleCircularBuffer currentATBearingCB = new DoubleCircularBuffer(8, true, false); // is bearing is false b/c this value is between -180 and 180 and we need to maintain the neg / positive
-    public DoubleCircularBuffer currentATYawCB = new DoubleCircularBuffer(8, true, false);
+    public DoubleCircularBuffer currentRangeCB = new DoubleCircularBuffer(30, true, false);
+    public DoubleCircularBuffer currentATBearingCB = new DoubleCircularBuffer(30, true, false); // is bearing is false b/c this value is between -180 and 180 and we need to maintain the neg / positive
+    public DoubleCircularBuffer currentATYawCB = new DoubleCircularBuffer(30, true, false);
     public double currentWebcamAngle = 0.0;
-    private Coordinate currentCameraCenter = new Coordinate(18, 18);
+    private Coordinate currentCameraCenter = new Coordinate(10000, 10000);
     private double currentRobotBearing = 0.0;
     public AprilTagDetection currentAprilTag;
 
 
     public static final double ROBOT_SIDE_LENGTH = 18; // length of the side of the robot in inches
     private static final boolean USE_WEBCAM = true;  // true for webcam, false for phone camera
-    private static final int INIT_APRIL_TAG_SEARCH_COUNT_MAX = 200;
+    private static final int INIT_APRIL_TAG_SEARCH_COUNT_MAX = 160000;
+    private int searchCount = 0;
     /**
      * The variable to store our instance of the AprilTag processor.
      */
@@ -116,13 +140,11 @@ public class CameraCore extends SensorCore {
 
 
     @Override
-    public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor) throws InterruptedException {
-        super.runOpMode(autonomousMode, teamColor);
-        this.teamColor = teamColor;
-        this.autonomousMode = autonomousMode;
+    public void runOpMode() throws InterruptedException {
+        super.runOpMode();
+        searchCount = 0;
         if (autonomousMode) {
             initVision();
-            int searchCount = 0;
             while (!aprilTagDetected()) {
                 searchStateMachine();
                 updateTelemetry(true);
@@ -131,13 +153,34 @@ public class CameraCore extends SensorCore {
                     break;
                 }
             }
+            while (
+                cameraPoses.getStdDevX() > 0.4
+                || cameraPoses.getStdDevY() > 0.4
+                || cameraPoses.getStdDevHeading() > 0.01
+            ) {
+                if (visionPortal != null && visionPortal.getCameraState() == VisionPortal.CameraState.STREAMING) {
+                    searchStateMachine();
+                }
+                updateTelemetry(true);
+                searchCount += 1;
+                if (searchCount > INIT_APRIL_TAG_SEARCH_COUNT_MAX) {
+                    break;
+                }
+            }
+            // centerWebcamOnAprilTag();
+            odo.resetPosAndIMU();
+            odo.setPosition(new Pose2D(DistanceUnit.INCH, cameraPoses.getAverageX(), cameraPoses.getAverageY(), AngleUnit.DEGREES, startAngle));
+            updateTelemetry(true);
             searchState = SearchState.WAITING_FOR_START;
         }
     }
 
     protected void workers(boolean enableController) throws InterruptedException {
         super.workers(enableController);
-        if (autonomousMode) {
+        if (
+                autonomousMode
+                && Boolean.TRUE.equals(componentState.get(ComponentState.CAMERA))
+        ) {
             searchStateMachine();
             updateTelemetry(false);
         }
@@ -201,10 +244,26 @@ public class CameraCore extends SensorCore {
 
     private void updateTelemetry(boolean updateTelemetry) throws InterruptedException {
         // telemetry.addData("currentRobotBounds", currentRobotBounds);
-        telemetry.addData("ATBearingCB Avg", currentATBearingCB.getAverage());
-        telemetry.addData("ATYawCB Avg", currentATYawCB.getAverage());
+        telemetry.addData("Search State", searchState);
+        telemetry.addData("Vision State", visionPortal.getCameraState());
+        if (!cameraPoses.isEmpty()) {
+            // telemetry.addData("Camera Pose (Location Latest)", "x:" + cameraPoses.getLatestX() + " y:" + cameraPoses.getLatestY() + " heading:" + cameraPoses.getLatestHeading());
+            telemetry.addData("Camera Pose (Location Avg)", "x:" + cameraPoses.getAverageX() + " y:" + cameraPoses.getAverageY() + " heading:" + cameraPoses.getAverageHeading());
+            telemetry.addData("Camera Pose (StdDev)", "xStdDev:" + cameraPoses.getStdDevX() + " yStdDev:" + cameraPoses.getStdDevY() + " headingStdDev:" + cameraPoses.getStdDevHeading());
+            telemetry.addData("Odo Pose", "x:" + odoPoses.getAverageX() + " y:" + odoPoses.getAverageY() + " heading:" + odoPoses.getAverageHeading());
+            /* telemetry.addData("Camera Pose (Size)", cameraPoses.size());
+            telemetry.addData("Camera Pose (X values)", Arrays.toString(cameraPoses.getXCoordinates()));
+            telemetry.addData("Camera Pose (Y values)", Arrays.toString(cameraPoses.getYCoordinates()));
+            telemetry.addData("Camera Pose (Headings)", Arrays.toString(cameraPoses.getHeadings())); */
+        }
+        // telemetry.addData("ATRangeCB Avg", currentRangeCB.getAverage());
+        // telemetry.addData("ATBearingCB Avg", currentATBearingCB.getAverage());
+        // telemetry.addData("ATYawCB Avg", currentATYawCB.getAverage());
+        telemetry.addData("currentRobotBearing", currentRobotBearing);
         telemetry.addData("currentWebcamAngle", currentWebcamAngle);
-        telemetry.addData("currentWebcamServo", webcamServoPosition);
+        // telemetry.addData("currentWebcamServo", webcamServoPosition);
+        telemetry.addData("Search Iteration Count", searchCount);
+        telemetry.addData("Team", teamColor);
         if (aprilTag != null) {
             List<AprilTagDetection> currentDetections = aprilTag.getDetections();
             telemetry.addData("# AprilTags Detected", currentDetections.size());
@@ -223,9 +282,6 @@ public class CameraCore extends SensorCore {
         double servoDiffMax = 1.0;
         double angleDiffMin = -(ANGLE_MAX - ANGLE_MIN);
         double angleDiffMax = ANGLE_MAX - ANGLE_MIN;
-        if (angleDiffMin == angleDiffMax) {
-            throw new InterruptedException("get servo diff - old range cannot have zero length");
-        }
 
         return ((bearingDegrees - angleDiffMin) * (servoDiffMax - servoDiffMin) / (angleDiffMax - angleDiffMin)) + servoDiffMin;
     }
@@ -416,7 +472,7 @@ public class CameraCore extends SensorCore {
                         }
                         break;
                 }
-                Log.d("updateCurrentRobotPosition", "id:" + currentAprilTag.id + " xAT:" + xAprilTag + " yAT:" + yAprilTag + " theta:" + theta + " thetaRad: " + thetaRadians + " currRange:" + currentRangeCB.getAverage() + " curX:" + currentX + " curY:" + currentY);
+                Log.d("FTIC-23217-CameraCore", "updateCurrentCameraCenter: id:" + currentAprilTag.id + " team:" + teamColor + " xAT:" + xAprilTag + " yAT:" + yAprilTag + " theta:" + theta + " thetaRad: " + thetaRadians + " currRange:" + currentRangeCB.getAverage() + " curX:" + currentX + " curY:" + currentY);
 
                 currentCameraCenter = new Coordinate(currentX, currentY);
             }
@@ -513,9 +569,9 @@ public class CameraCore extends SensorCore {
         } else {
             // TODO: Put better logic here on where to search next based on current location information.
             // TODO: Maybe create an algorithm that calculates closest april tag within view and then moves to it.
-            searchState = SearchState.MOVE_RIGHT;
+            searchState = previousSearchState;
         }
-        double currentBearing = robotState.bearingCB.getAverage();
+        // double currentBearing = bearingCB.getAverage();
         // go through specific search locations based on current x,y location
         /* switch (teamColor) {
             case RED:
@@ -559,7 +615,7 @@ public class CameraCore extends SensorCore {
     protected boolean aprilTagDetected() throws InterruptedException {
         if (aprilTag != null) {
             List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-            return currentDetections.size() > 0;
+            return !currentDetections.isEmpty();
         }
         return false;
     }
@@ -574,31 +630,27 @@ public class CameraCore extends SensorCore {
     private void centerWebcamOnAprilTag() throws InterruptedException {
         // TODO: Rewrite this code to better handle while the camera is moving.
         // TODO: Use the current velocity to adjust where we want to look. We may need to look ahead a little bit to handle delays in processing.
-        double servoDiff = getServoDiff(currentAprilTag.ftcPose.bearing);
-        double divisor = 3.0;
-        switch (teamColor){
-            case BLUE:
-                divisor = 3.0;
-                break;
-            case RED:
-                divisor = 4.0;
-                break;
-        }
-        Log.d("FTC-23217-CameraCore", "centerWebcamOnAprilTag: " + (servoDiff / divisor) + " webcamPosition:" + webcamServoPosition + " currWebcamPosition:" + webcamServo.getPosition());
+        if (!this.currentATBearingCB.isEmpty()) {
+            double bearingCBNewest = this.currentATBearingCB.newestPeek();
+            double servoDiff = getServoDiff(bearingCBNewest);
 
-        if (webcamServoPosition + (servoDiff / divisor) < 0) {
-            webcamServoPosition = 0.0;
-            searchTimer.reset();
-            searchState = SearchState.MOVE_LEFT;
-        } else if (webcamServoPosition + (servoDiff / divisor) > 1) {
-            webcamServoPosition = 1.0;
-            searchTimer.reset();
-            searchState = SearchState.MOVE_RIGHT;
-        } else {
-            webcamServoPosition += (servoDiff / divisor);
-            webcamServo.setPosition(webcamServoPosition);
-            searchTimer.reset();
-            searchState = SearchState.CHECKING_FOR_APRILTAG;
+            double newServoPosition = webcamServoPosition + servoDiff;
+            Log.d("FTC-23217-CameraCore", "centerWebcamOnAprilTag: bearingCBNewest:" + bearingCBNewest + " servoDiff:" + servoDiff + " webcamPosition:" + webcamServoPosition + " newWebcamPosition:" + newServoPosition);
+
+            if (newServoPosition < 0) {
+                webcamServoPosition = 0.0;
+                searchTimer.reset();
+                searchState = SearchState.MOVE_LEFT;
+            } else if (newServoPosition > 1) {
+                webcamServoPosition = 1.0;
+                searchTimer.reset();
+                searchState = SearchState.MOVE_RIGHT;
+            } else {
+                webcamServoPosition = newServoPosition;
+                webcamServo.setPosition(webcamServoPosition);
+                searchTimer.reset();
+                searchState = SearchState.CHECKING_FOR_APRILTAG;
+            }
         }
     }
 
@@ -606,23 +658,27 @@ public class CameraCore extends SensorCore {
         updateBestAprilTag();
         updateAprilTagBearing();
         updateAprilTagYaw();
+        updateCurrentWebcamAngle();
         updateCurrentRobotRange();
-        updateCurrentRobotRange();
+        updateCurrentRobotBearing();
         updateCurrentCameraCenter();
-        robotState.cameraPoses.addAndCalculate(
-            new Pose2D(
-                DistanceUnit.INCH,
-                currentCameraCenter.x,
-                currentCameraCenter.y,
-                AngleUnit.DEGREES,
-                currentRobotBearing
-            )
-        );
+        if (currentCameraCenter.x != 10000) { // ignore initial values
+            cameraPoses.addAndCalculate(
+                    new Pose2D(
+                            DistanceUnit.INCH,
+                            currentCameraCenter.x,
+                            currentCameraCenter.y,
+                            AngleUnit.DEGREES,
+                            currentRobotBearing
+                    )
+            );
+        }
+        // TODO: We need to update the Odo Pods pose. This MUST happen at start, and likey need to happen at certain points along autonomous mode.
     }
 
 
     private void searchStateMachine() throws InterruptedException {
-        Log.d("FTC-23217-CameraCore", "searchStateMachine: Start! searchState:" + searchState + " april tag detected:" + aprilTagDetected());
+        // Log.d("FTC-23217-CameraCore", "searchStateMachine: Start! searchState:" + searchState + " searchTimer:" + searchTimer.seconds() + " webcam:" + webcamServoPosition + " april tag detected:" + aprilTagDetected());
 
         updateCurrentWebcamAngle();
         switch (searchState) {
@@ -630,16 +686,19 @@ public class CameraCore extends SensorCore {
                 searchState = SearchState.CHECKING_FOR_APRILTAG;
                 break;
             case CHECKING_FOR_APRILTAG:
+                Log.d("FTC-23217-CameraCore", "searchStateMachine: Start! searchState:" + searchState + " searchTimer:" + searchTimer.seconds() + " webcam:" + webcamServoPosition + " april tag detected:" + aprilTagDetected());
                 if (aprilTagDetected()) {
                     updateRobotState();
                     // updateCurrentRobotBounds();
-                    centerWebcamOnAprilTag();
+                    // centerWebcamOnAprilTag();
                 } else {
+                    searchTimer.reset();
                     searchForAprilTag();
                 }
                 break;
             case SEARCHING_LEFT:
                 if (aprilTagDetected()) {
+                    previousSearchState = SearchState.SEARCHING_LEFT;
                     searchState = SearchState.CHECKING_FOR_APRILTAG;
                 } else {
                     if (searchTimer.seconds() > SEARCH_WAIT_TIME) {
@@ -653,6 +712,7 @@ public class CameraCore extends SensorCore {
                 break;
             case SEARCHING_RIGHT:
                 if (aprilTagDetected()) {
+                    previousSearchState = SearchState.SEARCHING_RIGHT;
                     searchState = SearchState.CHECKING_FOR_APRILTAG;
                 } else {
                     if (searchTimer.seconds() > SEARCH_WAIT_TIME) {
@@ -665,7 +725,9 @@ public class CameraCore extends SensorCore {
                 }
                 break;
             case MOVE_LEFT:
+                Log.d("FTC-23217-CameraCore", "searchStateMachine: Start! searchState:" + searchState + " searchTimer:" + searchTimer.seconds() + " webcam:" + webcamServoPosition + " april tag detected:" + aprilTagDetected());
                 if (aprilTagDetected()) {
+                    previousSearchState = SearchState.SEARCHING_LEFT;
                     searchState = SearchState.CHECKING_FOR_APRILTAG;
                 } else {
                     webcamServoPosition -= WEBCAM_SEARCH_STEP;
@@ -683,7 +745,9 @@ public class CameraCore extends SensorCore {
                 }
                 break;
             case MOVE_RIGHT:
+                Log.d("FTC-23217-CameraCore", "searchStateMachine: Start! searchState:" + searchState + " searchTimer:" + searchTimer.seconds() + " webcam:" + webcamServoPosition + " april tag detected:" + aprilTagDetected());
                 if (aprilTagDetected()) {
+                    previousSearchState = SearchState.SEARCHING_RIGHT;
                     searchState = SearchState.CHECKING_FOR_APRILTAG;
                 } else {
                     webcamServoPosition += WEBCAM_SEARCH_STEP;

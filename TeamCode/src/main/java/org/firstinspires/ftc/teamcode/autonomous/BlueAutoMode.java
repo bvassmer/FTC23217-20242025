@@ -10,8 +10,10 @@ import org.firstinspires.ftc.teamcode.core.AutoDriveCore;
 @Autonomous(group = "autonomousModes")
 public class BlueAutoMode extends AutoDriveCore {
     public void runOpMode() throws InterruptedException {
-        Log.d("FTC-23217-BlueAutoMode", "BlueAutoMode Start.");
-        super.runOpMode(true, Enum.TeamColor.BLUE, AutoDriveState.DRIVING_HANGING_PARTS_START);
+        this.autonomousMode = true;
+        this.startAngle = 180.0;
+        this.teamColor = Enum.TeamColor.BLUE;
+        super.runOpMode(AutoDriveState.DRIVING_HANGING_PARTS_START);
         waitForStart();
 
         if (isStopRequested()) return;

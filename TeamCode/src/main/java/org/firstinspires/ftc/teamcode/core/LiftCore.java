@@ -8,8 +8,6 @@ import org.firstinspires.ftc.teamcode.Enum;
 import org.firstinspires.ftc.teamcode.library.LinearVelocity;
 
 public class LiftCore extends ExtensionCore {
-    private boolean autonomousMode = false;
-    private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
     public enum RotationLiftState {
         WAITING,
         MOVE_TO_FRONT,
@@ -40,10 +38,8 @@ public class LiftCore extends ExtensionCore {
     public final double LIFT_ROTATION_PARK_REVERSE = 0.43;
 
     @Override
-    public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor) throws InterruptedException {
-        super.runOpMode(autonomousMode, teamColor);
-        this.teamColor = teamColor;
-        this.autonomousMode = autonomousMode;
+    public void runOpMode() throws InterruptedException {
+        super.runOpMode();
     }
 
     protected void workers(boolean enableController) throws InterruptedException {

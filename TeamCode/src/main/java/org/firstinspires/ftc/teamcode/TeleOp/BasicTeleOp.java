@@ -10,12 +10,12 @@ import org.firstinspires.ftc.teamcode.core.MechamCore;
 
 @TeleOp
 public class BasicTeleOp extends AutoDriveCore {
-    private boolean autonomousMode = false;
-    private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
     public void runOpMode() throws InterruptedException {
         Log.d("FTC-23217", "BasicTeleOp Start.");
+        this.autonomousMode = false;
+        this.teamColor = Enum.TeamColor.BLUE;
 
-        super.runOpMode(autonomousMode, teamColor);
+        super.runOpMode();
         waitForStart();
 
         if (isStopRequested()) return;

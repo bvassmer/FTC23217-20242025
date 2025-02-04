@@ -6,18 +6,14 @@ import org.firstinspires.ftc.teamcode.Enum;
 import org.firstinspires.ftc.teamcode.library.LinearVelocity;
 
 public class MechamCore extends TelemetryCore {
-    private boolean autonomousMode = false;
     private boolean debugMode = false;
-    private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
     private Double powerReduction = 0.4;
     public boolean isMoving = false;
 
     @Override
-    public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor) throws InterruptedException {
+    public void runOpMode() throws InterruptedException {
         Log.d("FTC-23217-MechamCore", "MechamCore Start.");
-        super.runOpMode(autonomousMode, teamColor);
-        this.teamColor = teamColor;
-        this.autonomousMode = autonomousMode;
+        super.runOpMode();
     }
 
     public void workers(boolean enableController, double x, double y, double rx, boolean debugMode) throws InterruptedException {

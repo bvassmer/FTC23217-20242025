@@ -8,7 +8,10 @@ import org.firstinspires.ftc.teamcode.core.AutoDriveCore;
 @Autonomous(group = "autonomousModes")
 public class RedAutoMode extends AutoDriveCore {
     public void runOpMode() throws InterruptedException {
-        super.runOpMode(true, Enum.TeamColor.RED, AutoDriveState.DRIVING_HANGING_PARTS_START);
+        this.autonomousMode = true;
+        this.startAngle = 0.0;
+        this.teamColor = Enum.TeamColor.RED;
+        super.runOpMode(AutoDriveState.DRIVING_HANGING_PARTS_START);
         waitForStart();
 
         if (isStopRequested()) return;

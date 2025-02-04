@@ -6,12 +6,8 @@ import org.firstinspires.ftc.teamcode.Enum;
 import org.firstinspires.ftc.teamcode.library.LinearVelocity;
 
 public class ControllerCore extends ClawCore {
-    private boolean autonomousMode = false;
-    private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
-    public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor) throws InterruptedException {
-        super.runOpMode(autonomousMode, teamColor);
-        this.teamColor = teamColor;
-        this.autonomousMode = autonomousMode;
+    public void runOpMode() throws InterruptedException {
+        super.runOpMode();
     }
 
     public void workers(boolean enableController) throws InterruptedException {

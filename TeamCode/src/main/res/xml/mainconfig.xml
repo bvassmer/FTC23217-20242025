@@ -8,17 +8,19 @@
             <Servo name="liftPivotServo" port="0" />
             <Servo name="clawPivotServo" port="2" />
             <Servo name="clawServo" port="4" />
+            <I2CXLMaxSonarEZ4 name="frontUltraSonicSensor" port ="0" />
             <!-- <ControlHubImuBHI260AP name="imu" port="0" bus="0" /> -->
             <!-- <HuskyLens name="huskyLens" port="0" bus="1" /> -->
         </LynxModule>
     </LynxUsbDevice>
-    <LynxUsbDevice name="Expansion Hub Portal" serialNumber="(embedded)" parentModuleAddress="173"> <!-- was 173 -->
+    <LynxUsbDevice name="Expansion Hub Portal" serialNumber="(embedded)" parentModuleAddress="173">
         <LynxModule name="Expansion Hub" port="2">
             <goBILDA5202SeriesMotor name="frontRightMotor" port="0" />
             <goBILDA5202SeriesMotor name="rearRightMotor" port="1" />
             <Servo name="liftPivotServoReverse" port="0" />
             <Servo name="webcamServo" port="2" />
-            <REV_VL53L0X_RANGE_SENSOR name="slideTofSensor" port="3" bus="3" />
+            <REV_VL53L0X_RANGE_SENSOR name="slideTofSensor" port="2" bus="3" />
+            <goBILDAPinpoint name="odo" port="3" />
         </LynxModule>
     </LynxUsbDevice>
     <!-- <Webcam name="ArduCam 1" serialNumber="65B01580" /> -->

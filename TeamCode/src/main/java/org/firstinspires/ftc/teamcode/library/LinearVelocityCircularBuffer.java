@@ -11,7 +11,7 @@ public class LinearVelocityCircularBuffer extends CircularBuffer {
     protected final LinearVelocity[] buffer;    // Array to store elements
     public LinearVelocityCircularBuffer(int capacity) {
         super(capacity);
-        this.buffer = (LinearVelocity[]) new Object[capacity];  // Type-safe cast
+        this.buffer = new LinearVelocity[capacity];  // Type-safe cast
     }
 
     public void addAndCalculate(LinearVelocity element) {

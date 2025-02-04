@@ -6,8 +6,6 @@ import org.firstinspires.ftc.teamcode.Enum;
 import org.firstinspires.ftc.teamcode.library.LinearVelocity;
 
 public class ExtensionCore extends CameraCore {
-    private boolean autonomousMode = false;
-    private Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
     public enum SLIDE_STATE {
         HOLDING,
         MANUAL_MOVING,
@@ -35,10 +33,8 @@ public class ExtensionCore extends CameraCore {
     public final short SLIDE_MAX = 300;
 
     @Override
-    public void runOpMode(boolean autonomousMode, Enum.TeamColor teamColor) throws InterruptedException {
-        super.runOpMode(autonomousMode, teamColor);
-        this.teamColor = teamColor;
-        this.autonomousMode = autonomousMode;
+    public void runOpMode() throws InterruptedException {
+        super.runOpMode();
     }
 
     protected void workers(boolean enableController) throws InterruptedException {
@@ -48,16 +44,17 @@ public class ExtensionCore extends CameraCore {
 
 
     private void moveToDropoff() throws InterruptedException {
-        if (robotState.slideTofCB.getAverage() < SLIDE_HOOKER_MIN_SLOW) {
+        componentState.put(ComponentState.SLIDE_TOF_SENSOR, true);
+        if (slideTofCB.getAverage() < SLIDE_HOOKER_MIN_SLOW) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move up fast ");
-            slideMotor.setPower(0.4);
-        } else if (robotState.slideTofCB.getAverage() < SLIDE_HOOKER_MIN) {
+            slideMotor.setPower(0.7);
+        } else if (slideTofCB.getAverage() < SLIDE_HOOKER_MIN) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move up slow ");
             slideMotor.setPower(0.2);
-        } else if  (robotState.slideTofCB.getAverage() > SLIDE_HOOKER_MAX_SLOW ) {
+        } else if  (slideTofCB.getAverage() > SLIDE_HOOKER_MAX_SLOW ) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move down fast ");
-            slideMotor.setPower(-0.3);
-        } else if (robotState.slideTofCB.getAverage() > SLIDE_HOOKER_MAX) {
+            slideMotor.setPower(-0.6);
+        } else if (slideTofCB.getAverage() > SLIDE_HOOKER_MAX) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move down slow ");
             slideMotor.setPower(-0.15);
         } else {
@@ -67,19 +64,20 @@ public class ExtensionCore extends CameraCore {
     }
 
     private void moveToPickup() throws InterruptedException {
-        if (robotState.slideTofCB.getAverage() >= SLIDE_PICKUP_HOOKER_MIN && robotState.slideTofCB.getAverage() <= SLIDE_PICKUP_HOOKER_MAX) {
+        componentState.put(ComponentState.SLIDE_TOF_SENSOR, true);
+        if (slideTofCB.getAverage() >= SLIDE_PICKUP_HOOKER_MIN && slideTofCB.getAverage() <= SLIDE_PICKUP_HOOKER_MAX) {
             // in range
             slideState = SLIDE_STATE.HOLDING;
-        } else if (robotState.slideTofCB.getAverage() > SLIDE_PICKUP_SLOW_MAX) {
+        } else if (slideTofCB.getAverage() > SLIDE_PICKUP_SLOW_MAX) {
             // too high, can move fast down
-            slideMotor.setPower(-0.3);
-        } else if (robotState.slideTofCB.getAverage() > SLIDE_PICKUP_HOOKER_MAX) {
+            slideMotor.setPower(-0.6);
+        } else if (slideTofCB.getAverage() > SLIDE_PICKUP_HOOKER_MAX) {
             // too high, in slow zone. move slow down
             slideMotor.setPower(-0.15);
-        } else if (robotState.slideTofCB.getAverage() < SLIDE_PICKUP_SLOW_MIN) {
+        } else if (slideTofCB.getAverage() < SLIDE_PICKUP_SLOW_MIN) {
             // too low, can move fast up
-            slideMotor.setPower(0.4);
-        } else if (robotState.slideTofCB.getAverage() < SLIDE_PICKUP_HOOKER_MIN) {
+            slideMotor.setPower(0.7);
+        } else if (slideTofCB.getAverage() < SLIDE_PICKUP_HOOKER_MIN) {
             // too low, in slow zone. move slow up
             slideMotor.setPower(0.2);
         } else {
@@ -90,9 +88,11 @@ public class ExtensionCore extends CameraCore {
     private void extensionStateMachine() throws InterruptedException {
         switch (slideState) {
             case HOLDING:
+                componentState.put(ComponentState.SLIDE_TOF_SENSOR, false);
                 slideMotor.setPower(0.05);
                 break;
             case HANGING:
+                componentState.put(ComponentState.SLIDE_TOF_SENSOR, false);
                 slideMotor.setPower(-0.8);
                 break;
             case AUTO_DROPOFF:
@@ -102,11 +102,12 @@ public class ExtensionCore extends CameraCore {
                 moveToPickup();
                 break;
             case MANUAL_MOVING:
+                componentState.put(ComponentState.SLIDE_TOF_SENSOR, false);
                 float y = gamepad2.left_stick_y;
                 if (y == 0.0) {
                     stopMoving();
                 } else {
-                    slideMotor.setPower(-y * 0.8);
+                    slideMotor.setPower(-y);
                 }
                 break;
             default:
