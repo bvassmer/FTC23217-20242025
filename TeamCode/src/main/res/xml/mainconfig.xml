@@ -9,8 +9,9 @@
             <Servo name="clawPivotServo" port="2" />
             <Servo name="clawServo" port="4" />
             <I2CXLMaxSonarEZ4 name="frontUltraSonicSensor" port ="0" />
-            <!-- <ControlHubImuBHI260AP name="imu" port="0" bus="0" /> -->
-            <!-- <HuskyLens name="huskyLens" port="0" bus="1" /> -->
+            <RevColorSensorV3 name="clawColorSensor" port="3" />
+            <RevTouchSensor name="rightTouchSensor" port="1" />
+            <RevTouchSensor name="leftTouchSensor" port="7" />
         </LynxModule>
     </LynxUsbDevice>
     <LynxUsbDevice name="Expansion Hub Portal" serialNumber="(embedded)" parentModuleAddress="173">
@@ -19,10 +20,11 @@
             <goBILDA5202SeriesMotor name="rearRightMotor" port="1" />
             <Servo name="liftPivotServoReverse" port="0" />
             <Servo name="webcamServo" port="2" />
-            <REV_VL53L0X_RANGE_SENSOR name="slideTofSensor" port="2" bus="3" />
+            <REV_VL53L0X_RANGE_SENSOR name="frontTofSensor" port="0" bus="0" />
+            <REV_VL53L0X_RANGE_SENSOR name="slideTofSensor" port="2" bus="2" />
             <goBILDAPinpoint name="odo" port="3" />
         </LynxModule>
     </LynxUsbDevice>
-    <!-- <Webcam name="ArduCam 1" serialNumber="65B01580" /> -->
+    <!-- <Webcam name="Webcam 1" serialNumber="65B01580" /> -->
     <Webcam name="ArduCam 1" serialNumber="UC763" />
 </Robot>

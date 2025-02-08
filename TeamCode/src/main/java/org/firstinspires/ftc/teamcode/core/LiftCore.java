@@ -30,8 +30,8 @@ public class LiftCore extends ExtensionCore {
     final double CLAW_OPEN_POSITION = 0.6;
     public final double SLIDE_PICKUP_HOOKER_LIFT_ROTATION = 0.4117;
     public final double SLIDE_PICKUP_HOOKER_LIFT_REVERSE_ROTATION = 0.5867;
-    public final double SLIDE_DROPOFF_HOOKER_LIFT_ROTATION = 0.47;
-    public final double SLIDE_DROPOFF_HOOKER_LIFT_REVERSE_ROTATION = 0.52;
+    public final double SLIDE_DROPOFF_HOOKER_LIFT_ROTATION = 0.415; // 0.47 old
+    public final double SLIDE_DROPOFF_HOOKER_LIFT_REVERSE_ROTATION = 0.57; // 0.52 old
     public final double SLIDE_DROPOFF_RELEASE_HOOKER_LIFT_ROTATION = 0.40;
     public final double SLIDE_DROPIFF_RELEASE_HOOKER_LIFT_REVERSE_ROTATION = 0.60;
     public final double LIFT_ROTATION_PARK = 0.56;
@@ -42,11 +42,8 @@ public class LiftCore extends ExtensionCore {
         super.runOpMode();
     }
 
-    protected void workers(boolean enableController) throws InterruptedException {
-        super.workers(enableController);
-        telemetry.addData("Lift Pivot Servo Position", liftPivotServo.getPosition());
-        telemetry.addData("Lift Pivot Servo Reverse Position", liftPivotServoReverse.getPosition());
-        telemetry.addData("Lift Pivot State", rotationLiftState);
+    protected void workers() throws InterruptedException {
+        super.workers();
         rotationStateMachine();
         startTimers();
     }
@@ -107,8 +104,8 @@ public class LiftCore extends ExtensionCore {
                 rotationTimer.reset();
                 if (liftPivotServoPosition + 0.02 < SAFE_LIFT_ROTATION_BACK) {
                     // SAFE, so allow movement
-                    liftPivotServoPosition = liftPivotServo.getPosition() + 0.02;
-                    liftPivotServoReversePosition = liftPivotServoReverse.getPosition() - 0.02;
+                    liftPivotServoPosition = liftPivotServoPosition + 0.02;
+                    liftPivotServoReversePosition = liftPivotServoReversePosition - 0.02;
                     liftPivotServo.setPosition(liftPivotServoPosition);
                     liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
                     rotationLiftState = RotationLiftState.MOVING;
@@ -121,8 +118,8 @@ public class LiftCore extends ExtensionCore {
                 rotationTimer.reset();
                 if (liftPivotServoPosition - 0.02 > SAFE_LIFT_ROTATION_FRONT) {
                     // SAFE, so allow movement
-                    liftPivotServoPosition = liftPivotServo.getPosition() - 0.02;
-                    liftPivotServoReversePosition = liftPivotServoReverse.getPosition() + 0.02;
+                    liftPivotServoPosition = liftPivotServoPosition - 0.02;
+                    liftPivotServoReversePosition = liftPivotServoReversePosition + 0.02;
                     liftPivotServo.setPosition(liftPivotServoPosition);
                     liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
                     rotationLiftState = RotationLiftState.MOVING;

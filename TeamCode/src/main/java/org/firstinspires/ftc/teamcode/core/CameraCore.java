@@ -13,7 +13,6 @@ import org.firstinspires.ftc.teamcode.Enum;
 import org.firstinspires.ftc.teamcode.library.AprilTagLocation;
 import org.firstinspires.ftc.teamcode.library.Coordinate;
 import org.firstinspires.ftc.teamcode.library.DoubleCircularBuffer;
-import org.firstinspires.ftc.teamcode.library.LinearVelocity;
 import org.firstinspires.ftc.teamcode.library.RobotBounds;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
@@ -43,9 +42,12 @@ public class CameraCore extends SensorCore {
     final static double SEARCH_WAIT_TIME = 0.2; // in seconds. equals 0.2s/cycle or 5 Hz.
     final static double CENTER_WAIT_TIME = 0.2; // in seconds. equals 0.2s/cycle or 5 Hz.
     final static double WEBCAM_SEARCH_STEP = 0.1;
-    final static double ANGLE_MIN = -105.0;
-    final static double ANGLE_MAX = 165.0;
-    final static double ANGLE_DIFF = ANGLE_MAX - ANGLE_MIN;
+    final static double BLUE_ANGLE_MIN = 75.0;
+    final static double BLUE_ANGLE_MAX = 345.0;
+    final static double RED_ANGLE_MIN = -105.0;
+    final static double RED_ANGLE_MAX = 165.0;
+    final static double BLUE_ANGLE_DIFF = BLUE_ANGLE_MAX - BLUE_ANGLE_MIN;
+    final static double RED_ANGLE_DIFF = RED_ANGLE_MAX - RED_ANGLE_MIN;
     final static double WEBCAM_SERVO_MIN = 0.0;
     final static double WEBCAM_SERVO_MAX = 1.0;
     final static double SPECIMEN_DROPOFF_BEARING = 0.0;
@@ -175,11 +177,11 @@ public class CameraCore extends SensorCore {
         }
     }
 
-    protected void workers(boolean enableController) throws InterruptedException {
-        super.workers(enableController);
+    protected void workers() throws InterruptedException {
+        super.workers();
         if (
                 autonomousMode
-                && Boolean.TRUE.equals(componentState.get(ComponentState.CAMERA))
+                && Boolean.TRUE.equals(MAP_COMPONENT.get(ComponentEnum.CAMERA))
         ) {
             searchStateMachine();
             updateTelemetry(false);
@@ -244,44 +246,63 @@ public class CameraCore extends SensorCore {
 
     private void updateTelemetry(boolean updateTelemetry) throws InterruptedException {
         // telemetry.addData("currentRobotBounds", currentRobotBounds);
-        telemetry.addData("Search State", searchState);
-        telemetry.addData("Vision State", visionPortal.getCameraState());
-        if (!cameraPoses.isEmpty()) {
-            // telemetry.addData("Camera Pose (Location Latest)", "x:" + cameraPoses.getLatestX() + " y:" + cameraPoses.getLatestY() + " heading:" + cameraPoses.getLatestHeading());
-            telemetry.addData("Camera Pose (Location Avg)", "x:" + cameraPoses.getAverageX() + " y:" + cameraPoses.getAverageY() + " heading:" + cameraPoses.getAverageHeading());
-            telemetry.addData("Camera Pose (StdDev)", "xStdDev:" + cameraPoses.getStdDevX() + " yStdDev:" + cameraPoses.getStdDevY() + " headingStdDev:" + cameraPoses.getStdDevHeading());
-            telemetry.addData("Odo Pose", "x:" + odoPoses.getAverageX() + " y:" + odoPoses.getAverageY() + " heading:" + odoPoses.getAverageHeading());
+        if (autonomousMode) {
+            telemetry.addData("Search State", searchState);
+            telemetry.addData("Vision State", visionPortal.getCameraState());
+            if (!cameraPoses.isEmpty()) {
+                // telemetry.addData("Camera Pose (Location Latest)", "x:" + cameraPoses.getLatestX() + " y:" + cameraPoses.getLatestY() + " heading:" + cameraPoses.getLatestHeading());
+                telemetry.addData("Camera Pose (Location Avg)", "x:" + cameraPoses.getAverageX() + " y:" + cameraPoses.getAverageY() + " heading:" + cameraPoses.getAverageHeading());
+                telemetry.addData("Camera Pose (StdDev)", "xStdDev:" + cameraPoses.getStdDevX() + " yStdDev:" + cameraPoses.getStdDevY() + " headingStdDev:" + cameraPoses.getStdDevHeading());
             /* telemetry.addData("Camera Pose (Size)", cameraPoses.size());
             telemetry.addData("Camera Pose (X values)", Arrays.toString(cameraPoses.getXCoordinates()));
             telemetry.addData("Camera Pose (Y values)", Arrays.toString(cameraPoses.getYCoordinates()));
             telemetry.addData("Camera Pose (Headings)", Arrays.toString(cameraPoses.getHeadings())); */
-        }
-        // telemetry.addData("ATRangeCB Avg", currentRangeCB.getAverage());
-        // telemetry.addData("ATBearingCB Avg", currentATBearingCB.getAverage());
-        // telemetry.addData("ATYawCB Avg", currentATYawCB.getAverage());
-        telemetry.addData("currentRobotBearing", currentRobotBearing);
-        telemetry.addData("currentWebcamAngle", currentWebcamAngle);
-        // telemetry.addData("currentWebcamServo", webcamServoPosition);
-        telemetry.addData("Search Iteration Count", searchCount);
-        telemetry.addData("Team", teamColor);
-        if (aprilTag != null) {
-            List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-            telemetry.addData("# AprilTags Detected", currentDetections.size());
-        }
-        if (updateTelemetry) {
-            telemetry.update();
+            }
+            // telemetry.addData("ATRangeCB Avg", currentRangeCB.getAverage());
+            // telemetry.addData("ATBearingCB Avg", currentATBearingCB.getAverage());
+            // telemetry.addData("ATYawCB Avg", currentATYawCB.getAverage());
+            telemetry.addData("currentRobotBearing", currentRobotBearing);
+            telemetry.addData("currentWebcamAngle", currentWebcamAngle);
+            // telemetry.addData("currentWebcamServo", webcamServoPosition);
+            telemetry.addData("Search Iteration Count", searchCount);
+            telemetry.addData("Team", teamColor);
+            if (aprilTag != null) {
+                List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+                telemetry.addData("# AprilTags Detected", currentDetections.size());
+            }
+            if (updateTelemetry) {
+                telemetry.update();
+            }
         }
     }
 
     private void updateCurrentWebcamAngle() throws InterruptedException {
-        currentWebcamAngle = (webcamServoPosition * ANGLE_DIFF) + ANGLE_MIN;
+        switch (teamColor) {
+            case BLUE:
+                currentWebcamAngle = (webcamServoPosition * BLUE_ANGLE_DIFF) + BLUE_ANGLE_MIN;
+                break;
+            case RED:
+                currentWebcamAngle = (webcamServoPosition * RED_ANGLE_DIFF) + RED_ANGLE_MIN;
+                break;
+        }
     }
 
     private double getServoDiff(double bearingDegrees) throws InterruptedException {
         double servoDiffMin = -1.0;
         double servoDiffMax = 1.0;
-        double angleDiffMin = -(ANGLE_MAX - ANGLE_MIN);
-        double angleDiffMax = ANGLE_MAX - ANGLE_MIN;
+
+        double angleDiffMin = 0.0;
+        double angleDiffMax = 0.0;
+        switch (teamColor) {
+            case BLUE:
+                angleDiffMin = -(BLUE_ANGLE_MAX - BLUE_ANGLE_MIN);
+                angleDiffMax = BLUE_ANGLE_MAX - BLUE_ANGLE_MIN;
+                break;
+            case RED:
+                angleDiffMin = -(RED_ANGLE_MAX - RED_ANGLE_MIN);
+                angleDiffMax = RED_ANGLE_MAX - RED_ANGLE_MIN;
+                break;
+        }
 
         return ((bearingDegrees - angleDiffMin) * (servoDiffMax - servoDiffMin) / (angleDiffMax - angleDiffMin)) + servoDiffMin;
     }
@@ -356,59 +377,55 @@ public class CameraCore extends SensorCore {
                 double yaw = currentATYawCB.getAverage();
                 double bearing = currentATBearingCB.getAverage();
                 double theta = yaw - bearing;
+                if (teamColor == Enum.TeamColor.BLUE) {
+                    theta += 180;
+                }
                 double thetaRadians = Math.toRadians(theta);
 
                 double currentX = 0;
                 double currentY = 0;
+
+                int BLUE_LEFT_ANGLE = 90;
+                int BLUE_FRONT_ANGLE = 180;
+                int BLUE_RIGHT_ANGLE = 270;
+                int BLUE_BACK_ANGLE = 360;
+                int RED_LEFT_ANGLE = -90;
+                int RED_FRONT_ANGLE = 0;
+                int RED_RIGHT_ANGLE = 90;
+                int RED_BACK_ANGLE = 180;
                 switch (teamColor) {
                     case BLUE:
                         switch (currentAprilTag.id) {
                             case 11:
                             case 16:
-                                if (currentWebcamAngle >= 0 && currentWebcamAngle < 90) {
-                                    currentX = xAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                } else if (currentWebcamAngle >= 90 && currentWebcamAngle <= 180) {
-                                    currentX = xAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                } else if (currentWebcamAngle < 0 && currentWebcamAngle > -90) {
-                                    currentX = xAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                }
+                                currentX = xAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
+                                currentY = yAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                 break;
                             case 13:
                             case 14:
-                                if (currentWebcamAngle >= 0 && currentWebcamAngle < 90) {
-                                    currentX = xAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                } else if (currentWebcamAngle >= 90 && currentWebcamAngle <= 180) {
-                                    currentX = xAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                } else if (currentWebcamAngle < 0 && currentWebcamAngle > -90) {
-                                    currentX = xAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                }
+                                currentX = xAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
+                                currentY = yAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                 break;
                             case 15:
-                                if (currentWebcamAngle >= 0 && currentWebcamAngle < 90) {
+                                if (currentWebcamAngle >= BLUE_FRONT_ANGLE && currentWebcamAngle < BLUE_RIGHT_ANGLE) {
                                     currentX = xAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                } else if (currentWebcamAngle >= 90 && currentWebcamAngle <= 180) {
+                                } else if (currentWebcamAngle >= BLUE_RIGHT_ANGLE && currentWebcamAngle <= BLUE_BACK_ANGLE) {
                                     currentX = xAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                } else if (currentWebcamAngle < 0 && currentWebcamAngle > -90) {
+                                } else if (currentWebcamAngle < BLUE_FRONT_ANGLE && currentWebcamAngle > BLUE_LEFT_ANGLE) {
                                     currentX = xAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
                                 }
                                 break;
                             case 12:
-                                if (currentWebcamAngle >= 0 && currentWebcamAngle < 90) {
+                                if (currentWebcamAngle >= BLUE_FRONT_ANGLE && currentWebcamAngle < BLUE_RIGHT_ANGLE) {
                                     currentX = xAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                } else if (currentWebcamAngle >= 90 && currentWebcamAngle <= 180) {
+                                } else if (currentWebcamAngle >= BLUE_RIGHT_ANGLE && currentWebcamAngle <= BLUE_BACK_ANGLE) {
                                     currentX = xAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                } else if (currentWebcamAngle < 0 && currentWebcamAngle > -90) {
+                                } else if (currentWebcamAngle < BLUE_FRONT_ANGLE && currentWebcamAngle > BLUE_LEFT_ANGLE) {
                                     currentX = xAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
                                 }
@@ -420,50 +437,34 @@ public class CameraCore extends SensorCore {
                         switch (currentAprilTag.id) {
                             case 13:
                             case 14:
-                                if (currentWebcamAngle >= 0 && currentWebcamAngle < 90) {
-                                    currentX = xAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                } else if (currentWebcamAngle >= 90 && currentWebcamAngle <= 180) {
-                                    currentX = xAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                } else if (currentWebcamAngle < 0 && currentWebcamAngle > -90) {
-                                    currentX = xAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                }
+                                currentX = xAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
+                                currentY = yAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                 break;
                             case 11:
                             case 16:
-                                if (currentWebcamAngle >= 0 && currentWebcamAngle < 90) {
-                                    currentX = xAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                } else if (currentWebcamAngle >= 90 && currentWebcamAngle <= 180) {
-                                    currentX = xAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                } else if (currentWebcamAngle < 0 && currentWebcamAngle > -90) {
-                                    currentX = xAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                    currentY = yAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
-                                }
+                                currentX = xAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
+                                currentY = yAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                 break;
                             case 12:
-                                if (currentWebcamAngle >= 0 && currentWebcamAngle < 90) {
+                                if (currentWebcamAngle >= RED_FRONT_ANGLE && currentWebcamAngle < RED_RIGHT_ANGLE) {
                                     currentX = xAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                } else if (currentWebcamAngle >= 90 && currentWebcamAngle <= 180) {
+                                } else if (currentWebcamAngle >= RED_RIGHT_ANGLE && currentWebcamAngle <= RED_BACK_ANGLE) {
                                     currentX = xAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                } else if (currentWebcamAngle < 0 && currentWebcamAngle > -90) {
+                                } else if (currentWebcamAngle < RED_FRONT_ANGLE && currentWebcamAngle > RED_LEFT_ANGLE) {
                                     currentX = xAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag - (currentRangeCB.getAverage() * Math.cos(thetaRadians));
                                 }
                                 break;
                             case 15:
-                                if (currentWebcamAngle >= 0 && currentWebcamAngle < 90) {
+                                if (currentWebcamAngle >= RED_FRONT_ANGLE && currentWebcamAngle < RED_RIGHT_ANGLE) {
                                     currentX = xAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                } else if (currentWebcamAngle >= 90 && currentWebcamAngle <= 180) {
+                                } else if (currentWebcamAngle >= RED_RIGHT_ANGLE && currentWebcamAngle <= RED_BACK_ANGLE) {
                                     currentX = xAprilTag + (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
-                                } else if (currentWebcamAngle < 0 && currentWebcamAngle > -90) {
+                                } else if (currentWebcamAngle < RED_FRONT_ANGLE && currentWebcamAngle > RED_LEFT_ANGLE) {
                                     currentX = xAprilTag - (currentRangeCB.getAverage() * Math.sin(thetaRadians));
                                     currentY = yAprilTag + (currentRangeCB.getAverage() * Math.cos(thetaRadians));
                                 }
@@ -662,18 +663,19 @@ public class CameraCore extends SensorCore {
         updateCurrentRobotRange();
         updateCurrentRobotBearing();
         updateCurrentCameraCenter();
+        Pose2D currentLocation = new Pose2D(
+                DistanceUnit.INCH,
+                currentCameraCenter.x,
+                currentCameraCenter.y,
+                AngleUnit.DEGREES,
+                currentRobotBearing
+        );
         if (currentCameraCenter.x != 10000) { // ignore initial values
             cameraPoses.addAndCalculate(
-                    new Pose2D(
-                            DistanceUnit.INCH,
-                            currentCameraCenter.x,
-                            currentCameraCenter.y,
-                            AngleUnit.DEGREES,
-                            currentRobotBearing
-                    )
+                currentLocation
             );
         }
-        // TODO: We need to update the Odo Pods pose. This MUST happen at start, and likey need to happen at certain points along autonomous mode.
+        // odo.setPosition(currentLocation);
     }
 
 

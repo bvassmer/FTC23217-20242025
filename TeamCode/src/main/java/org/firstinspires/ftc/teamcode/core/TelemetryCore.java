@@ -12,22 +12,25 @@ public class TelemetryCore extends ControllerCore {
         super.runOpMode();
     }
 
-    public void workers(boolean enableController) throws InterruptedException {
-        super.workers(enableController);
-        outputTelemetry(enableController);
+    public void workers() throws InterruptedException {
+        super.workers();
+        outputTelemetry();
     }
 
-    public void outputTelemetry(boolean enableController) throws InterruptedException {
-        telemetry.addData("Auto mode", autonomousMode);
-        telemetry.addData("Enable Controller", enableController);
-        telemetry.addData("liftPivotServo Position", liftPivotServoPosition);
-        telemetry.addData("liftPivotServoReverse Position", liftPivotServoReversePosition);
+    public void outputTelemetry() throws InterruptedException {
+        telemetry.addData("Lift Pivot Servo Position", liftPivotServoPosition);
+        telemetry.addData("Lift Pivot Servo Position (Rev)", liftPivotServoReversePosition);
         telemetry.addData("clawPivotServoPosition Position", clawPivotServoPosition);
         telemetry.addData("clawServoPosition Position", clawServoPosition);
         telemetry.addData("clawServoState", clawPivotState);
-        telemetry.addData("searchState", searchState);
-        telemetry.addData("searchTimer", searchTimer);
         telemetry.addData("webcamServoPosition", webcamServoPosition);
+        telemetry.addData("Lift Pivot State", rotationLiftState);
+        telemetry.addData("Auto mode", this.autonomousMode);
+        telemetry.addData("Enable Controller", this.enableController);
+        if (autonomousMode) {
+            telemetry.addData("searchState", searchState);
+            telemetry.addData("searchTimer", searchTimer);
+        }
 
         telemetry.update();
     }

@@ -10,9 +10,9 @@ public class ControllerCore extends ClawCore {
         super.runOpMode();
     }
 
-    public void workers(boolean enableController) throws InterruptedException {
-        super.workers(enableController);
-        if (enableController) {
+    public void workers() throws InterruptedException {
+        super.workers();
+        if (this.enableController) {
             runControllerOne();
             runControllerTwo();
         }

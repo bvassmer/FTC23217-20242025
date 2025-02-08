@@ -24,8 +24,8 @@ public class ClawCore extends LiftCore {
     protected ElapsedTime pivotTimer = new ElapsedTime();
     final Double PIVOT_TIME = 0.2; // in seconds. equals 0.2s/cycle or 5 Hz.
 
-    final double CLAW_CLOSED_POSITION = 0.7;
-    final double CLAW_OPEN_POSITION = 0.6;
+    final double CLAW_CLOSED_POSITION = 0.75;
+    final double CLAW_OPEN_POSITION = 0.63;
     final double CLAW_PIVOT_MIN_DOWN_POSITION = 0.14;
     final double CLAW_PIVOT_MAX_UP_POSITION = 0.49;
     final double CLAW_DROPOFF_POSITION = 0.49;
@@ -36,8 +36,8 @@ public class ClawCore extends LiftCore {
         super.runOpMode();
     }
 
-    protected void workers(boolean enableController) throws InterruptedException {
-        super.workers(enableController);
+    protected void workers() throws InterruptedException {
+        super.workers();
         pivotClawStateMachine();
         clawStateMachine();
     }
@@ -45,11 +45,9 @@ public class ClawCore extends LiftCore {
     private void pivotClawStateMachine() throws InterruptedException {
         switch (clawPivotState) {
             case WAITING:
-                clawPivotServoPosition = clawPivotServo.getPosition();
                 break;
             case MOVE_DOWN:
                 pivotTimer.reset();
-                clawPivotServoPosition = clawPivotServo.getPosition();
                 if (clawPivotServoPosition - 0.03 <= CLAW_PIVOT_MIN_DOWN_POSITION) {
                     clawPivotServoPosition = CLAW_PIVOT_MIN_DOWN_POSITION;
                     clawPivotServo.setPosition(clawPivotServoPosition);
@@ -61,7 +59,6 @@ public class ClawCore extends LiftCore {
                 break;
             case MOVE_UP:
                 pivotTimer.reset();
-                clawPivotServoPosition = clawPivotServo.getPosition();
                 if (clawPivotServoPosition + 0.03 >= CLAW_PIVOT_MAX_UP_POSITION) {
                     clawPivotServoPosition = CLAW_PIVOT_MAX_UP_POSITION;
                     clawPivotServo.setPosition(clawPivotServoPosition);
@@ -97,7 +94,6 @@ public class ClawCore extends LiftCore {
     private void clawStateMachine() throws InterruptedException {
         switch (clawState) {
             case WAITING:
-                clawServoPosition = clawServo.getPosition();
                 break;
             case OPEN:
                 clawServoPosition = CLAW_OPEN_POSITION;

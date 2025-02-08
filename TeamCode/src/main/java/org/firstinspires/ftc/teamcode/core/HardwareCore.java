@@ -9,7 +9,8 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.hardware.rev.Rev2mDistanceSensor;
-// import com.qualcomm.robotcore.hardware.TouchSensor;
+import com.qualcomm.hardware.rev.RevTouchSensor;
+import com.qualcomm.hardware.rev.RevColorSensorV3;
 
 
 import org.firstinspires.ftc.teamcode.Enum;
@@ -20,22 +21,18 @@ import org.firstinspires.ftc.teamcode.library.I2CXLMaxSonarEZ4;
 public class HardwareCore extends BaseCore {
     final Double SAFE_CAR_WASH_SERVO_POSITION = 0.83;
     final Double SAFE_CAR_WASH_SLIDE_SERVO_POSITION = 0.59;
-    public DcMotor frontLeftMotor, rearLeftMotor, frontRightMotor, rearRightMotor, slideMotor;
-    public Servo liftPivotServo, liftPivotServoReverse, clawPivotServo, clawServo, webcamServo;
-    public Double liftPivotServoPosition, liftPivotServoReversePosition, clawPivotServoPosition, clawServoPosition, webcamServoPosition;
-    public Rev2mDistanceSensor slideTofSensor;
-    public I2CXLMaxSonarEZ4 frontUltraSonicSensor;
-    public GoBildaPinpointDriver odo;
+    protected DcMotor frontLeftMotor, rearLeftMotor, frontRightMotor, rearRightMotor, slideMotor;
+    protected Servo liftPivotServo, liftPivotServoReverse, clawPivotServo, clawServo, webcamServo;
+    protected Double liftPivotServoPosition, liftPivotServoReversePosition, clawPivotServoPosition, clawServoPosition, webcamServoPosition;
+    protected I2CXLMaxSonarEZ4 frontUltraSonicSensor;
+    protected Rev2mDistanceSensor slideTofSensor, frontTofSensor;
+    protected RevTouchSensor rightTouchSensor, leftTouchSensor;
+    protected RevColorSensorV3 clawColorSensor;
+    protected GoBildaPinpointDriver odo;
 
-    public Enum.TeamColor teamColor;
+    protected Enum.TeamColor teamColor;
 
-    private static double SERVO_LIFT_PIVOT_START = 0.56;
-    private static double SERVO_LIFT_PIVOT_REVERSE_START = 0.43;
-    private static double SERVO_CLAW_PIVOT_START =  0.14;
-    private static double SERVO_CLAW_START = 0.7;
-    private static double SERVO_WEBCAM_START = 0.4;
-    private boolean enableController = false;
-    double oldTime = 0;
+    protected double oldTime = 0;
 
     // public IMU imu;
 
@@ -45,14 +42,14 @@ public class HardwareCore extends BaseCore {
         super.runOpMode();
         setupMotors();
         setupServos();
+        initializeServos();
         if (autonomousMode) {
             moveServosToStart();
         }
         setupSensors();
     }
 
-    protected void workers(boolean enableController) throws InterruptedException {
-        this.enableController = enableController;
+    protected void workers() throws InterruptedException {
     }
 
     private void setupMotors() throws InterruptedException {
@@ -79,7 +76,31 @@ public class HardwareCore extends BaseCore {
         webcamServo = hardwareMap.servo.get("webcamServo");
     }
 
+    private void initializeServos() throws InterruptedException {
+        if (liftPivotServoPosition == null || liftPivotServoPosition == 0.0) {
+           liftPivotServoPosition =  0.495;
+        }
+        if (liftPivotServoReversePosition == null || liftPivotServoReversePosition == 0.0) {
+            liftPivotServoReversePosition = 0.49;
+        }
+        if (clawPivotServoPosition == null || clawPivotServoPosition == 0.0) {
+            clawPivotServoPosition = 0.49;
+        }
+        if (clawServoPosition == null || clawServoPosition == 0.0) {
+            clawServoPosition = 0.75;
+        }
+        if (webcamServoPosition == null || webcamServoPosition == 0.0) {
+            webcamServoPosition = 0.6;
+        }
+    }
+
     private void moveServosToStart() throws InterruptedException {
+        double SERVO_LIFT_PIVOT_START = 0.56;
+        double SERVO_LIFT_PIVOT_REVERSE_START = 0.43;
+        double SERVO_CLAW_PIVOT_START = 0.14;
+        double SERVO_CLAW_START = 0.75;
+        double SERVO_WEBCAM_START = 0.4;
+
         liftPivotServoPosition = SERVO_LIFT_PIVOT_START;
         liftPivotServoReversePosition = SERVO_LIFT_PIVOT_REVERSE_START;
         liftPivotServo.setPosition(liftPivotServoPosition);
@@ -100,7 +121,13 @@ public class HardwareCore extends BaseCore {
         frontUltraSonicSensor.initialize();
         slideTofSensor = hardwareMap.get(Rev2mDistanceSensor.class, "slideTofSensor");
         slideTofSensor.initialize();
+        frontTofSensor = hardwareMap.get(Rev2mDistanceSensor.class, "frontTofSensor");
+        frontTofSensor.initialize();
         odo = hardwareMap.get(GoBildaPinpointDriver.class,"odo");
+        odo.resetPosAndIMU();
+        clawColorSensor = hardwareMap.get(RevColorSensorV3.class, "clawColorSensor");
+        leftTouchSensor = hardwareMap.get(RevTouchSensor.class, "leftTouchSensor");
+        rightTouchSensor = hardwareMap.get(RevTouchSensor.class, "rightTouchSensor");
         // imu = hardwareMap.get(IMU.class, "imu");
 
     }

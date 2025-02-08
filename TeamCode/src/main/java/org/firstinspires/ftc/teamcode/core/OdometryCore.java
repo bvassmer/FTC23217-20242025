@@ -1,5 +1,8 @@
 package org.firstinspires.ftc.teamcode.core;
 
+import android.util.Log;
+
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.library.GoBildaPinpointDriver;
 
 import java.util.Locale;
@@ -7,17 +10,30 @@ import java.util.Locale;
 public class OdometryCore extends DataCore {
     public int xOdoPosition, yOdoPosition;
     public int previousXOdoPosition, previousYRightOdoPosition;
+    private int runMax = 2;
+    private int runCount = 0;
 
     public void runOpMode() throws InterruptedException {
         super.runOpMode();
         setupOdoComputer();
     }
 
-    protected void workers(boolean enableController) throws InterruptedException {
-        super.workers(enableController);
-        if (autonomousMode) {
+    protected void workers() throws InterruptedException {
+        super.workers();
+        if (autonomousMode || Boolean.TRUE.equals(MAP_DEBUG.get(DebugEnum.ODOMETERY))) {
             updateOdometry();
             updateIsMoving();
+            if (runCount <= runMax) {
+                switch (teamColor) {
+                    case BLUE:
+                        odo.setPosition(MAP_BLUE_POSE.get(POSE.START));
+                        break;
+                    case RED:
+                        odo.setPosition(MAP_RED_POSE.get(POSE.START));
+                        break;
+                }
+                runCount += 1;
+            }
         }
     }
 
@@ -46,7 +62,7 @@ public class OdometryCore extends DataCore {
         increase when you move the robot forward. And the Y (strafe) pod should increase when
         you move the robot to the left.
          */
-        odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.FORWARD);
+        odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.REVERSED);
 
         /*
         Before running the robot, recalibrate the IMU. This needs to happen when the robot is stationary
@@ -56,8 +72,16 @@ public class OdometryCore extends DataCore {
         This is recommended before you run your autonomous, as a bad initial calibration can cause
         an incorrect starting value for x, y, and heading.
          */
-        //odo.recalibrateIMU();
-        odo.resetPosAndIMU();
+        // odo.recalibrateIMU();
+        // odo.resetPosAndIMU();
+        switch (teamColor) {
+            case BLUE:
+                odo.setPosition(MAP_BLUE_POSE.get(POSE.START));
+                break;
+            case RED:
+                odo.setPosition(MAP_RED_POSE.get(POSE.START));
+                break;
+        }
     }
 
     public void updateOdometry() throws InterruptedException {
@@ -65,18 +89,19 @@ public class OdometryCore extends DataCore {
         Request an update from the Pinpoint odometry computer. This checks almost all outputs
         from the device in a single I2C read.
         */
+        Log.d("FTC-23217-OdometryCore", "Odometry Update");
         odo.update();
 
         /*
         gets the current Position (x & y in mm, and heading in degrees) of the robot, and prints it.
         */
-        odoPoses.addAndCalculate(odo.getPosition());
+        // odoPoses.addAndCalculate(odo.getPosition());
         // String data = String.format(Locale.US, "{X: %.3f, Y: %.3f, H: %.3f}", pos.getX(DistanceUnit.MM), pos.getY(DistanceUnit.MM), pos.getHeading(AngleUnit.DEGREES));
 
         /*
         gets the current Velocity (x & y in mm/sec and heading in degrees/sec) and prints it.
         */
-        odoVelocityPoses.addAndCalculate(odo.getVelocity());
+        // odoVelocityPoses.addAndCalculate(odo.getVelocity());
         // String velocity = String.format(Locale.US,"{XVel: %.3f, YVel: %.3f, HVel: %.3f}", vel.getX(DistanceUnit.MM), vel.getY(DistanceUnit.MM), vel.getHeading(AngleUnit.DEGREES));
 
 
