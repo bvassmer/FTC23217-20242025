@@ -44,10 +44,10 @@ public class ExtensionCore extends CameraCore {
         MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
         if (tofSlideSensorReading < SLIDE_HOOKER_MIN_SLOW) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move up fast ");
-            slideMotor.setPower(0.8);
+            slideMotor.setPower(0.9);
         } else if (tofSlideSensorReading < SLIDE_HOOKER_MIN) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move up slow ");
-            slideMotor.setPower(0.2);
+            slideMotor.setPower(0.25);
         } else if  (tofSlideSensorReading > SLIDE_HOOKER_MAX_SLOW ) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move down fast ");
             slideMotor.setPower(-0.6);
@@ -73,10 +73,10 @@ public class ExtensionCore extends CameraCore {
             slideMotor.setPower(-0.15);
         } else if (tofSlideSensorReading < SLIDE_PICKUP_SLOW_MIN) {
             // too low, can move fast up
-            slideMotor.setPower(0.8);
+            slideMotor.setPower(0.9);
         } else if (tofSlideSensorReading < SLIDE_PICKUP_HOOKER_MIN) {
             // too low, in slow zone. move slow up
-            slideMotor.setPower(0.2);
+            slideMotor.setPower(0.25);
         } else {
             slideState = SLIDE_STATE.HOLDING;
         }

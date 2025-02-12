@@ -2,10 +2,13 @@ package org.firstinspires.ftc.teamcode.core;
 
 import android.util.Log;
 
+import com.qualcomm.robotcore.util.ElapsedTime;
+
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.library.GoBildaPinpointDriver;
 
 import java.util.Locale;
+import java.util.Objects;
 
 public class OdometryCore extends DataCore {
     public int xOdoPosition, yOdoPosition;
@@ -13,28 +16,53 @@ public class OdometryCore extends DataCore {
     private int runMax = 2;
     private int runCount = 0;
 
+    public enum OdometryState {
+        READ,
+        WAIT,
+    }
+
+    private double ODOMETRY_DELAY_TIME = 0.05;
+    private ElapsedTime odometryStateTimer = new ElapsedTime();
+    public OdometryState odometryState = OdometryState.READ;
+
     public void runOpMode() throws InterruptedException {
         super.runOpMode();
         setupOdoComputer();
+        startTimesre();
     }
 
     protected void workers() throws InterruptedException {
         super.workers();
         if (autonomousMode || Boolean.TRUE.equals(MAP_DEBUG.get(DebugEnum.ODOMETERY))) {
-            updateOdometry();
+            odometryStateMachine();
             updateIsMoving();
-            if (runCount <= runMax) {
-                switch (teamColor) {
-                    case BLUE:
-                        odo.setPosition(MAP_BLUE_POSE.get(POSE.START));
-                        break;
-                    case RED:
-                        odo.setPosition(MAP_RED_POSE.get(POSE.START));
-                        break;
+            /* if (runCount <= runMax) {
+                if (Boolean.TRUE.equals(this.MAP_DEBUG.get(DebugEnum.TESTING))) {
+                    switch (teamColor) {
+                        case BLUE:
+                            odo.setPosition(MAP_BLUE_POSE.get(POSE.TEST_START));
+                            break;
+                        case RED:
+                            odo.setPosition(MAP_RED_POSE.get(POSE.TEST_START));
+                            break;
+                    }
+                } else {
+                    switch (teamColor) {
+                        case BLUE:
+                            odo.setPosition(MAP_BLUE_POSE.get(POSE.START));
+                            break;
+                        case RED:
+                            odo.setPosition(MAP_RED_POSE.get(POSE.START));
+                            break;
+                    }
                 }
                 runCount += 1;
-            }
+            } */
         }
+    }
+
+    private void startTimesre() {
+        odometryStateTimer.startTime();
     }
 
     private void setupOdoComputer() throws InterruptedException {
@@ -46,7 +74,8 @@ public class OdometryCore extends DataCore {
         the tracking point the Y (strafe) odometry pod is. forward of center is a positive number,
         backwards is a negative number.
          */
-        odo.setOffsets(302.22, -78.575);
+        // odo.setOffsets(302.22, -78.575);
+        odo.setOffsets(88.601, -153.601);
 
         /*
         Set the kind of pods used by your robot. If you're using goBILDA odometry pods, select either
@@ -62,7 +91,7 @@ public class OdometryCore extends DataCore {
         increase when you move the robot forward. And the Y (strafe) pod should increase when
         you move the robot to the left.
          */
-        odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.REVERSED);
+        odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.REVERSED);
 
         /*
         Before running the robot, recalibrate the IMU. This needs to happen when the robot is stationary
@@ -73,14 +102,28 @@ public class OdometryCore extends DataCore {
         an incorrect starting value for x, y, and heading.
          */
         // odo.recalibrateIMU();
-        // odo.resetPosAndIMU();
-        switch (teamColor) {
-            case BLUE:
-                odo.setPosition(MAP_BLUE_POSE.get(POSE.START));
-                break;
-            case RED:
-                odo.setPosition(MAP_RED_POSE.get(POSE.START));
-                break;
+        odo.resetPosAndIMU();
+        sleep(500);
+        odo.update();
+
+        if (Boolean.TRUE.equals(this.MAP_DEBUG.get(DebugEnum.TESTING))) {
+            switch (teamColor) {
+                case BLUE:
+                    odo.setPosition(Objects.requireNonNull(MAP_BLUE_POSE.get(POSE.TEST_START)));
+                    break;
+                case RED:
+                    odo.setPosition(Objects.requireNonNull(MAP_RED_POSE.get(POSE.TEST_START)));
+                    break;
+            }
+        } else {
+            switch (teamColor) {
+                case BLUE:
+                    odo.setPosition(Objects.requireNonNull(MAP_BLUE_POSE.get(POSE.START)));
+                    break;
+                case RED:
+                    odo.setPosition(Objects.requireNonNull(MAP_RED_POSE.get(POSE.START)));
+                    break;
+            }
         }
     }
 
@@ -131,6 +174,21 @@ public class OdometryCore extends DataCore {
             isMoving = false;
             // TODO: see how long this takes and if it is needed
             // odo.recalibrateIMU(); //recalibrates the IMU without resetting position
+        }
+    }
+
+    private void odometryStateMachine() throws InterruptedException {
+        switch (odometryState) {
+            case READ:
+                updateOdometry();
+                odometryStateTimer.reset();
+                odometryState = OdometryState.WAIT;
+                break;
+            case WAIT:
+                if (odometryStateTimer.seconds() > ODOMETRY_DELAY_TIME ) {
+                    odometryState = OdometryState.READ;
+                }
+                break;
         }
     }
 }

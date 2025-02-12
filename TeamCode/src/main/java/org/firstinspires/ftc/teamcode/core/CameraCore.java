@@ -170,8 +170,8 @@ public class CameraCore extends SensorCore {
                 }
             }
             // centerWebcamOnAprilTag();
-            odo.resetPosAndIMU();
-            odo.setPosition(new Pose2D(DistanceUnit.INCH, cameraPoses.getAverageX(), cameraPoses.getAverageY(), AngleUnit.DEGREES, startAngle));
+            // odo.resetPosAndIMU();
+            // odo.setPosition(new Pose2D(DistanceUnit.INCH, cameraPoses.getAverageX(), cameraPoses.getAverageY(), AngleUnit.DEGREES, startAngle));
             updateTelemetry(true);
             searchState = SearchState.WAITING_FOR_START;
         }
@@ -253,6 +253,7 @@ public class CameraCore extends SensorCore {
                 // telemetry.addData("Camera Pose (Location Latest)", "x:" + cameraPoses.getLatestX() + " y:" + cameraPoses.getLatestY() + " heading:" + cameraPoses.getLatestHeading());
                 telemetry.addData("Camera Pose (Location Avg)", "x:" + cameraPoses.getAverageX() + " y:" + cameraPoses.getAverageY() + " heading:" + cameraPoses.getAverageHeading());
                 telemetry.addData("Camera Pose (StdDev)", "xStdDev:" + cameraPoses.getStdDevX() + " yStdDev:" + cameraPoses.getStdDevY() + " headingStdDev:" + cameraPoses.getStdDevHeading());
+                telemetry.addData("Pose (ODO)", "X:" + odo.getPosition().getX(DistanceUnit.INCH) + " Y:" + odo.getPosition().getY(DistanceUnit.INCH) + " Heading(non-norm):" + Math.toDegrees(odo.getHeading()) + " Heading(norm):" +odo.getPosition().getHeading(AngleUnit.DEGREES));
             /* telemetry.addData("Camera Pose (Size)", cameraPoses.size());
             telemetry.addData("Camera Pose (X values)", Arrays.toString(cameraPoses.getXCoordinates()));
             telemetry.addData("Camera Pose (Y values)", Arrays.toString(cameraPoses.getYCoordinates()));

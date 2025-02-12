@@ -43,21 +43,25 @@ public class MechamCore extends TelemetryCore {
         // Denominator is the largest motor power (absolute value) or 1
         // This ensures all the powers maintain the same ratio,
         // but only if at least one is out of the range [-1, 1]
-        double denominator = Math.max(Math.abs(fixedY) + Math.abs(fixedX) + Math.abs(fixedRx), 1);
+        // double denominator = Math.max(Math.abs(fixedY) + Math.abs(fixedX) + Math.abs(fixedRx), 1);
 
-        if (y != 0 || x != 0 || rx != 0) {
-            isMoving = true;
-        } else {
-            isMoving = false;
-        }
+        // Why This Works: ✅ Ensures proportional scaling between x, y, and rx when they all exist.
+        // ✅ Fixes interactions between translation and rotation, preventing unstable power outputs.
+        // ✅ Prevents movement distortion when moving diagonally or rotating at the same time.
+        double magnitude = Math.sqrt(fixedY * fixedY + fixedX * fixedX + fixedRx * fixedRx);
+        double denominator = Math.max(magnitude, 1);  // Prevents division by zero
+
+
+        isMoving = (y != 0 || x != 0 || rx != 0);
 
         double powerReduction = getPowerReduction();
         Log.d("FTC-23217-autoMechamMovement", "isMoving:" + isMoving + " x:" + fixedX + " y:" + fixedY + " rx:" + fixedRx + " powerReduction:" + powerReduction);
 
-        double frontLeftPower = -(fixedY + fixedX + fixedRx) / denominator * powerReduction * FRONT_LEFT_ADJUSTMENT;
+        double frontLeftPower = -(fixedY + fixedX + fixedRx) / denominator * powerReduction * FRONT_LEFT_ADJUSTMENT; // negated b/c of 90 degree bevel gears
         double rearLeftPower = (fixedY - fixedX + fixedRx) / denominator * powerReduction * REAR_LEFT_ADJUSTMENT;
-        double frontRightPower = -(fixedY - fixedX - fixedRx) / denominator * powerReduction * FRONT_RIGHT_ADJUSTMENT;
+        double frontRightPower = -(fixedY - fixedX - fixedRx) / denominator * powerReduction * FRONT_RIGHT_ADJUSTMENT; // negated b/c of 90 degree bevel gears
         double rearRightPower = (fixedY + fixedX - fixedRx) / denominator * powerReduction * REAR_RIGHT_ADJUSTMENT;
+        Log.d("FTC-23217-autoMechamMovement", "frontLeftPower:" + frontLeftPower + " rearLeftPower:" + rearLeftPower + " frontRightPower:" + frontRightPower + " rearRightPower:" + rearRightPower);
 
         if (
                 this.autonomousMode
@@ -85,12 +89,16 @@ public class MechamCore extends TelemetryCore {
 
             if (sensorValue >= maxMotorPowerSensorValue) {
                 powerReduction = 1; // Full power if the sensor is at maximum value
-            } else if (sensorValue <= zeroMotorPowerSensorValue) {
-                powerReduction = 0; // Zero power if the sensor value is at or below the minimum threshold
+            } else if (sensorValue <= zeroMotorPowerSensorValue && sensorValue > zeroMotorPowerSensorValue * 0.95) {
+                powerReduction = 0.0;
+            } else if (sensorValue <= zeroMotorPowerSensorValue * 0.95) {
+                powerReduction = -0.05; // Zero power if the sensor value is at or below the minimum threshold
             } else {
                 powerReduction = (sensorValue - zeroMotorPowerSensorValue) / (maxMotorPowerSensorValue - zeroMotorPowerSensorValue);
             }
-        } return powerReduction;
+            Log.d("FTC-23217-MechamCore-getPowerReduction", "sensorValue" + sensorValue + " powerReduction:" + powerReduction);
+        }
+        return powerReduction;
     }
 
     private void mechamMovement() throws InterruptedException {
@@ -107,22 +115,25 @@ public class MechamCore extends TelemetryCore {
             powerReduction = 0.6;
         }
 
-        if (y != 0 || x != 0 || rx != 0) {
-            isMoving = true;
-        } else {
-            isMoving = false;
-        }
+        isMoving = (y != 0 || x != 0 || rx != 0);
+
         Log.d("FTC-23217-mechamMovement", "isMoving:" + isMoving + " x:" + x + " y:" + y + " rx:" + rx + " rt:" + rt);
 
         // Denominator is the largest motor power (absolute value) or 1
         // This ensures all the powers maintain the same ratio,
         // but only if at least one is out of the range [-1, 1]
-        double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
+        // double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
 
-        double frontLeftPower = powerCurve(-(y + x + rx) / denominator) * FRONT_LEFT_ADJUSTMENT;
-        double rearLeftPower = powerCurve((y - x + rx) / denominator) * REAR_LEFT_ADJUSTMENT;
-        double frontRightPower = powerCurve(-(y - x - rx) / denominator) * FRONT_RIGHT_ADJUSTMENT;
-        double rearRightPower = powerCurve((y + x - rx) / denominator) * REAR_RIGHT_ADJUSTMENT;
+        // Why This Works: ✅ Ensures proportional scaling between x, y, and rx when they all exist.
+        // ✅ Fixes interactions between translation and rotation, preventing unstable power outputs.
+        // ✅ Prevents movement distortion when moving diagonally or rotating at the same time.
+        double magnitude = Math.sqrt(y * y + x * x + rx * rx);
+        double denominator = Math.max(magnitude, 1);  // Prevents division by zero
+
+        double frontLeftPower = sigmoidPowerCurve(-(y + x + rx) / denominator) * FRONT_LEFT_ADJUSTMENT; // negated b/c of 90 degree bevel gears
+        double rearLeftPower = sigmoidPowerCurve((y - x + rx) / denominator) * REAR_LEFT_ADJUSTMENT;
+        double frontRightPower = sigmoidPowerCurve(-(y - x - rx) / denominator) * FRONT_RIGHT_ADJUSTMENT; // negated b/c of 90 degree bevel gears
+        double rearRightPower = sigmoidPowerCurve((y + x - rx) / denominator) * REAR_RIGHT_ADJUSTMENT;
         if (Boolean.TRUE.equals(this.MAP_DEBUG.get(DebugEnum.DRIVE_MOTORS))) {
             frontLeftMotor.setPower(frontLeftPower);
             rearLeftMotor.setPower(rearLeftPower);
@@ -133,5 +144,11 @@ public class MechamCore extends TelemetryCore {
 
     private Double powerCurve(Double power) throws InterruptedException {
         return Math.pow(power, 3) * powerReduction;
+    }
+
+    private Double sigmoidPowerCurve(Double power) throws InterruptedException {
+        double a = 5.0; // Adjusts how aggressively the curve smooths (higher = sharper)
+
+        return Math.signum(power) * ((1 / (1 + Math.exp(-a * Math.abs(power)))) - 0.5) * 2 * powerReduction;
     }
 }

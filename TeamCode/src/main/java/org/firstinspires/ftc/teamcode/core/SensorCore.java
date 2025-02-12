@@ -124,7 +124,7 @@ public class SensorCore extends OdometryCore {
         short ULTRASONIC_MIN_DISTANCE = 20;
         short ULTRASONIC_MAX_DISTANCE = 765;
         if (rawFrontDistance < ULTRASONIC_MAX_DISTANCE && rawFrontDistance > ULTRASONIC_MIN_DISTANCE) {
-            ultrasonicFrontSensorReading = rawFrontDistance;
+            this.ultrasonicFrontSensorReading = rawFrontDistance * 10; // cm to mm
         }
     }
 

@@ -6,6 +6,7 @@ import org.firstinspires.ftc.teamcode.Enum;
 import org.firstinspires.ftc.teamcode.library.LinearVelocity;
 
 public class ClawCore extends LiftCore {
+    protected boolean isClawTouching = false;
     public enum ClawPivotState {
         WAITING,
         MOVE_UP,
@@ -22,14 +23,23 @@ public class ClawCore extends LiftCore {
     public ClawPivotState clawPivotState = ClawPivotState.WAITING;
     public ClawState clawState = ClawState.WAITING;
     protected ElapsedTime pivotTimer = new ElapsedTime();
-    final Double PIVOT_TIME = 0.2; // in seconds. equals 0.2s/cycle or 5 Hz.
+    final Double PIVOT_TIME = 1.0 / 240.0; // 1 degree takes 1/240 second = 0.004166666667 second
+    // math below is for GoBilda Torque Servo
+    // Max rotation 300 degrees from 0 to 1 servo distance
+    // 0.25 sec / 60 degrees rotation speed (40 RPM)
+    // 1 sec / 240 degrees rotation speed
+    // 1 degree takes 1/240 second = 0.004166666667 second
+    // 0.49 - 0.14 - 0.35 travel servo distance for claw pivot
+    // 300 degrees * 0.35 travel distance = 105 degrees of travel
+    final Double PIVOT_DISTANCE = 0.35 / 105.0; // 1 degree of travel is 0.35 / 105 = 0.003333333333 servo travel distance
+
 
     final double CLAW_CLOSED_POSITION = 0.75;
     final double CLAW_OPEN_POSITION = 0.63;
     final double CLAW_PIVOT_MIN_DOWN_POSITION = 0.14;
     final double CLAW_PIVOT_MAX_UP_POSITION = 0.49;
     final double CLAW_DROPOFF_POSITION = 0.49;
-    final double CLAW_PICKUP_POSITION = 0.29;
+    final double CLAW_PICKUP_POSITION = 0.31;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -38,8 +48,13 @@ public class ClawCore extends LiftCore {
 
     protected void workers() throws InterruptedException {
         super.workers();
+        updateIsClawTouching();
         pivotClawStateMachine();
         clawStateMachine();
+    }
+
+    private void updateIsClawTouching() throws InterruptedException {
+        isClawTouching = (isRightTouchSensorPressed || isLeftTouchSensorPressed);
     }
 
     private void pivotClawStateMachine() throws InterruptedException {
@@ -48,22 +63,22 @@ public class ClawCore extends LiftCore {
                 break;
             case MOVE_DOWN:
                 pivotTimer.reset();
-                if (clawPivotServoPosition - 0.03 <= CLAW_PIVOT_MIN_DOWN_POSITION) {
+                if (clawPivotServoPosition - PIVOT_DISTANCE <= CLAW_PIVOT_MIN_DOWN_POSITION) {
                     clawPivotServoPosition = CLAW_PIVOT_MIN_DOWN_POSITION;
                     clawPivotServo.setPosition(clawPivotServoPosition);
                 } else {
-                    clawPivotServoPosition = clawPivotServoPosition - 0.03;
+                    clawPivotServoPosition = clawPivotServoPosition - PIVOT_DISTANCE;
                     clawPivotServo.setPosition(clawPivotServoPosition);
                 }
                 clawPivotState = ClawPivotState.MOVING;
                 break;
             case MOVE_UP:
                 pivotTimer.reset();
-                if (clawPivotServoPosition + 0.03 >= CLAW_PIVOT_MAX_UP_POSITION) {
+                if (clawPivotServoPosition + PIVOT_DISTANCE >= CLAW_PIVOT_MAX_UP_POSITION) {
                     clawPivotServoPosition = CLAW_PIVOT_MAX_UP_POSITION;
                     clawPivotServo.setPosition(clawPivotServoPosition);
                 } else {
-                    clawPivotServoPosition = clawPivotServoPosition + 0.03;
+                    clawPivotServoPosition = clawPivotServoPosition + PIVOT_DISTANCE;
                     clawPivotServo.setPosition(clawPivotServoPosition);
                 }
                 clawPivotState = ClawPivotState.MOVING;

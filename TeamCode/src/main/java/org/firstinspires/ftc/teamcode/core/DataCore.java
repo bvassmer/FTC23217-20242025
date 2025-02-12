@@ -43,8 +43,8 @@ public class DataCore extends HardwareCore {
     protected LinearVelocityCircularBuffer cameraLinearVelocityCB = new LinearVelocityCircularBuffer(circularBufferCapacity);
     protected double tickFrequency = 0;
     protected ComponentEnum sensorForDriveControl = ComponentEnum.NONE;
-    protected int zeroMotorPowerSensorValue = 500;
-    protected int maxMotorPowerSensorValue = 100000;
+    protected int zeroMotorPowerSensorValue = 100;
+    protected int maxMotorPowerSensorValue = 300;
     protected enum ComponentEnum {
         SLIDE_TOF_SENSOR,
         FRONT_TOF_SENSOR,
@@ -58,7 +58,8 @@ public class DataCore extends HardwareCore {
         SENSORS,
         CAMERA,
         DRIVE_MOTORS,
-        ODOMETERY
+        ODOMETERY,
+        TESTING,
     }
 
     protected Map<ComponentEnum, Boolean> MAP_COMPONENT = Stream.of(new Object[][] {
@@ -74,6 +75,7 @@ public class DataCore extends HardwareCore {
                     { DebugEnum.CAMERA, false },
                     { DebugEnum.DRIVE_MOTORS, true },
                     { DebugEnum.ODOMETERY, false },
+                    { DebugEnum.TESTING, false},
             })
             .collect(Collectors.toMap(data -> (DebugEnum) data[0], data -> (Boolean) data[1]));
     protected enum POSE {
@@ -81,8 +83,11 @@ public class DataCore extends HardwareCore {
         DROP_OFF,
         DROP_OFF_ALIGNMENT,
         DROP_OFF_BACKUP,
-        PICKUP,
+        WAYPOINT_PRE_PICKUP,
         PICKUP_TURN,
+        PICKUP,
+        PICKUP_TO_DROP_OFF_TRANSITION,
+        PICKUP_TO_DROP_OFF_ROTATION,
         PARK,
         WAYPOINT_ONE_SPECIMEN_ONE,
         WAYPOINT_TWO_SPECIMEN_ONE,
@@ -94,29 +99,36 @@ public class DataCore extends HardwareCore {
         WAYPOINT_ONE_SPECIMEN_THREE,
         WAYPOINT_TWO_SPECIMEN_THREE,
         PUSH_SPECIMEN_THREE,
+        TEST_START,
+        TEST_TURN,
     }
     protected final Map<POSE, Pose2D> MAP_BLUE_POSE = Stream.of(new Object[][] {
                     { POSE.START, new Pose2D(DistanceUnit.INCH, -21.25, 56, AngleUnit.DEGREES, 180)},
                     { POSE.DROP_OFF_ALIGNMENT, new Pose2D(DistanceUnit.INCH, -6, 42, AngleUnit.DEGREES, 180)},
                     { POSE.DROP_OFF, new Pose2D(DistanceUnit.INCH, -6, 34, AngleUnit.DEGREES, 180)},
                     { POSE.DROP_OFF_BACKUP, new Pose2D(DistanceUnit.INCH, -6, 40, AngleUnit.DEGREES, 180)},
-                    { POSE.PICKUP_TURN, new Pose2D(DistanceUnit.INCH, -58, 36, AngleUnit.DEGREES, 0)},
-                    { POSE.PICKUP, new Pose2D(DistanceUnit.INCH, -38, 58, AngleUnit.DEGREES, 0)},
+                    { POSE.WAYPOINT_PRE_PICKUP, new Pose2D(DistanceUnit.INCH, -51, 36, AngleUnit.DEGREES, 180)},
+                    { POSE.PICKUP_TURN, new Pose2D(DistanceUnit.INCH, -51, 36, AngleUnit.DEGREES, 0)},
+                    { POSE.PICKUP, new Pose2D(DistanceUnit.INCH, -54, 49, AngleUnit.DEGREES, 0)},
+                    { POSE.PICKUP_TO_DROP_OFF_TRANSITION, new Pose2D(DistanceUnit.INCH, -32, 42, AngleUnit.DEGREES, 0)},
+                    { POSE.PICKUP_TO_DROP_OFF_ROTATION, new Pose2D(DistanceUnit.INCH, -32, 42, AngleUnit.DEGREES, 180)},
                     { POSE.PARK, new Pose2D(DistanceUnit.INCH, -70, 46, AngleUnit.DEGREES, 180)},
-                    { POSE.WAYPOINT_ONE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -46, 35, AngleUnit.DEGREES, 180)},
-                    { POSE.WAYPOINT_TWO_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -46, 3, AngleUnit.DEGREES, 180)},
-                    { POSE.WAYPOINT_THREE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -52, 3, AngleUnit.DEGREES, 180)},
-                    { POSE.PUSH_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -52, 46, AngleUnit.DEGREES, 180)},
-                    { POSE.WAYPOINT_ONE_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, -52, 3, AngleUnit.DEGREES, 180)},
-                    { POSE.WAYPOINT_TWO_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, -63, 3, AngleUnit.DEGREES, 180)},
-                    { POSE.PUSH_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, -63, 46, AngleUnit.DEGREES, 180)},
-                    { POSE.WAYPOINT_ONE_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, -63, 3, AngleUnit.DEGREES, 180)},
-                    { POSE.WAYPOINT_TWO_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, -70, 3, AngleUnit.DEGREES, 180)},
-                    { POSE.PUSH_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, -70, 46, AngleUnit.DEGREES, 180)},
+                    { POSE.WAYPOINT_ONE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -45, 35, AngleUnit.DEGREES, 180)},
+                    { POSE.WAYPOINT_TWO_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -45, 3, AngleUnit.DEGREES, 180)},
+                    { POSE.WAYPOINT_THREE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -51, 3, AngleUnit.DEGREES, 180)},
+                    { POSE.PUSH_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -51, 46, AngleUnit.DEGREES, 180)},
+                    { POSE.WAYPOINT_ONE_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, -51, 3, AngleUnit.DEGREES, 180)},
+                    { POSE.WAYPOINT_TWO_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, -62, 3, AngleUnit.DEGREES, 180)},
+                    { POSE.PUSH_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, -62, 46, AngleUnit.DEGREES, 180)},
+                    { POSE.WAYPOINT_ONE_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, -62, 3, AngleUnit.DEGREES, 180)},
+                    { POSE.WAYPOINT_TWO_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, -68, 3, AngleUnit.DEGREES, 180)},
+                    { POSE.PUSH_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, -68, 46, AngleUnit.DEGREES, 180)},
+                    { POSE.TEST_START, new Pose2D(DistanceUnit.INCH, -60, 36, AngleUnit.DEGREES, 180)},
+                    { POSE.TEST_TURN, new Pose2D(DistanceUnit.INCH, -60, 36, AngleUnit.DEGREES, 0)},
             })
             .collect(Collectors.toMap(data -> (POSE) data[0], data -> (Pose2D) data[1]));
 
-    protected final Map<AutoDriveCore.StepState, Pose2D> MAP_BLUE_STEP_POSE = Stream.of(new Object[][] {
+    protected final Map<AutoDriveCore.GenericMoveStepState, Pose2D> MAP_BLUE_STEP_POSE = Stream.of(new Object[][] {
                     { AutoDriveCore.GenericMoveStepState.WAYPOINT_ONE_SPECIMEN_ONE, MAP_BLUE_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_ONE) },
                     { AutoDriveCore.GenericMoveStepState.WAYPOINT_TWO_SPECIMEN_ONE, MAP_BLUE_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_ONE) },
                     { AutoDriveCore.GenericMoveStepState.WAYPOINT_THREE_SPECIMEN_ONE, MAP_BLUE_POSE.get(POSE.WAYPOINT_THREE_SPECIMEN_ONE) },
@@ -127,29 +139,52 @@ public class DataCore extends HardwareCore {
                     { AutoDriveCore.GenericMoveStepState.WAYPOINT_ONE_SPECIMEN_THREE, MAP_BLUE_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_THREE) },
                     { AutoDriveCore.GenericMoveStepState.WAYPOINT_TWO_SPECIMEN_THREE, MAP_BLUE_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_THREE) },
                     { AutoDriveCore.GenericMoveStepState.PUSH_SPECIMEN_THREE, MAP_BLUE_POSE.get(POSE.PUSH_SPECIMEN_THREE) },
+                    { AutoDriveCore.GenericMoveStepState.WAYPOINT_PRE_PICKUP, MAP_BLUE_POSE.get(POSE.WAYPOINT_PRE_PICKUP) },
                     { AutoDriveCore.GenericMoveStepState.PICKUP_TURN, MAP_BLUE_POSE.get(POSE.PICKUP_TURN) },
             })
-            .collect(Collectors.toMap(data -> (AutoDriveCore.StepState) data[0], data -> (Pose2D) data[1]));
+            .collect(Collectors.toMap(data -> (AutoDriveCore.GenericMoveStepState) data[0], data -> (Pose2D) data[1]));
+
     protected final Map<POSE, Pose2D> MAP_RED_POSE = Stream.of(new Object[][] {
                     { POSE.START, new Pose2D(DistanceUnit.INCH, 21.25, -56, AngleUnit.DEGREES, 0)},
                     { POSE.DROP_OFF_ALIGNMENT, new Pose2D(DistanceUnit.INCH, 6, -42, AngleUnit.DEGREES, 0)},
                     { POSE.DROP_OFF, new Pose2D(DistanceUnit.INCH, 6, -34, AngleUnit.DEGREES, 0)},
                     { POSE.DROP_OFF_BACKUP, new Pose2D(DistanceUnit.INCH, 6, -40, AngleUnit.DEGREES, 0)},
-                    { POSE.PICKUP, new Pose2D(DistanceUnit.INCH, 38, -58, AngleUnit.DEGREES, 180)},
-                    { POSE.PICKUP_TURN, new Pose2D(DistanceUnit.INCH, 38, -36, AngleUnit.DEGREES, 180)},
+                    { POSE.WAYPOINT_PRE_PICKUP, new Pose2D(DistanceUnit.INCH, 51, -36, AngleUnit.DEGREES, 0)},
+                    { POSE.PICKUP_TURN, new Pose2D(DistanceUnit.INCH, 51, -36, AngleUnit.DEGREES, 180)},
+                    { POSE.PICKUP, new Pose2D(DistanceUnit.INCH, 54, -49, AngleUnit.DEGREES, 180)},
+                    { POSE.PICKUP_TO_DROP_OFF_TRANSITION, new Pose2D(DistanceUnit.INCH, 32, -42, AngleUnit.DEGREES, 180)},
+                    { POSE.PICKUP_TO_DROP_OFF_ROTATION, new Pose2D(DistanceUnit.INCH, 32, -42, AngleUnit.DEGREES, 0)},
                     { POSE.PARK, new Pose2D(DistanceUnit.INCH, 70, -46, AngleUnit.DEGREES, 0)},
-                    { POSE.WAYPOINT_ONE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 46, -35, AngleUnit.DEGREES, 0)},
-                    { POSE.WAYPOINT_TWO_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 46, -3, AngleUnit.DEGREES, 0)},
-                    { POSE.WAYPOINT_THREE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 52, -3, AngleUnit.DEGREES, 0)},
-                    { POSE.PUSH_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 52, -46, AngleUnit.DEGREES, 0)},
-                    { POSE.WAYPOINT_ONE_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, 52, -3, AngleUnit.DEGREES, 0)},
-                    { POSE.WAYPOINT_TWO_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, 63, -3, AngleUnit.DEGREES, 0)},
-                    { POSE.PUSH_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, 63, -46, AngleUnit.DEGREES, 0)},
-                    { POSE.WAYPOINT_ONE_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, 63, -3, AngleUnit.DEGREES, 0)},
-                    { POSE.WAYPOINT_TWO_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, 70, -3, AngleUnit.DEGREES, 0)},
-                    { POSE.PUSH_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, 70, -46, AngleUnit.DEGREES, 0)},
+                    { POSE.WAYPOINT_ONE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 45, -35, AngleUnit.DEGREES, 0)},
+                    { POSE.WAYPOINT_TWO_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 45, -3, AngleUnit.DEGREES, 0)},
+                    { POSE.WAYPOINT_THREE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 51, -3, AngleUnit.DEGREES, 0)},
+                    { POSE.PUSH_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 51, -46, AngleUnit.DEGREES, 0)},
+                    { POSE.WAYPOINT_ONE_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, 51, -3, AngleUnit.DEGREES, 0)},
+                    { POSE.WAYPOINT_TWO_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, 62, -3, AngleUnit.DEGREES, 0)},
+                    { POSE.PUSH_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, 62, -46, AngleUnit.DEGREES, 0)},
+                    { POSE.WAYPOINT_ONE_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, 62, -3, AngleUnit.DEGREES, 0)},
+                    { POSE.WAYPOINT_TWO_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, 68, -3, AngleUnit.DEGREES, 0)},
+                    { POSE.PUSH_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, 68, -46, AngleUnit.DEGREES, 0)},
+                    { POSE.TEST_START, new Pose2D(DistanceUnit.INCH, 60, -36, AngleUnit.DEGREES, 0)},
+                    { POSE.TEST_TURN, new Pose2D(DistanceUnit.INCH, 60, -36, AngleUnit.DEGREES, 180)},
             })
             .collect(Collectors.toMap(data -> (POSE) data[0], data -> (Pose2D) data[1]));
+
+    protected final Map<AutoDriveCore.GenericMoveStepState, Pose2D> MAP_RED_STEP_POSE = Stream.of(new Object[][] {
+                    { AutoDriveCore.GenericMoveStepState.WAYPOINT_ONE_SPECIMEN_ONE, MAP_RED_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_ONE) },
+                    { AutoDriveCore.GenericMoveStepState.WAYPOINT_TWO_SPECIMEN_ONE, MAP_RED_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_ONE) },
+                    { AutoDriveCore.GenericMoveStepState.WAYPOINT_THREE_SPECIMEN_ONE, MAP_RED_POSE.get(POSE.WAYPOINT_THREE_SPECIMEN_ONE) },
+                    { AutoDriveCore.GenericMoveStepState.PUSH_SPECIMEN_ONE, MAP_RED_POSE.get(POSE.PUSH_SPECIMEN_ONE) },
+                    { AutoDriveCore.GenericMoveStepState.WAYPOINT_ONE_SPECIMEN_TWO, MAP_RED_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_TWO) },
+                    { AutoDriveCore.GenericMoveStepState.WAYPOINT_TWO_SPECIMEN_TWO, MAP_RED_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_TWO) },
+                    { AutoDriveCore.GenericMoveStepState.PUSH_SPECIMEN_TWO, MAP_RED_POSE.get(POSE.PUSH_SPECIMEN_TWO) },
+                    { AutoDriveCore.GenericMoveStepState.WAYPOINT_ONE_SPECIMEN_THREE, MAP_RED_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_THREE) },
+                    { AutoDriveCore.GenericMoveStepState.WAYPOINT_TWO_SPECIMEN_THREE, MAP_RED_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_THREE) },
+                    { AutoDriveCore.GenericMoveStepState.PUSH_SPECIMEN_THREE, MAP_RED_POSE.get(POSE.PUSH_SPECIMEN_THREE) },
+                    { AutoDriveCore.GenericMoveStepState.WAYPOINT_PRE_PICKUP, MAP_RED_POSE.get(POSE.WAYPOINT_PRE_PICKUP) },
+                    { AutoDriveCore.GenericMoveStepState.PICKUP_TURN, MAP_RED_POSE.get(POSE.PICKUP_TURN) },
+            })
+            .collect(Collectors.toMap(data -> (AutoDriveCore.GenericMoveStepState) data[0], data -> (Pose2D) data[1]));
 
     public void runOpMode() throws InterruptedException {
         Log.d("FTC-23217", "DataCore Start.");
@@ -195,15 +230,15 @@ public class DataCore extends HardwareCore {
             } else {
                 telemetry.addData("Linear Velocity (CAM): ", cameraLinearVelocityCB.toString());
             }
-            telemetry.addData("Pose (ODO)", "X:" + odo.getPosition().getX(DistanceUnit.INCH) + " Y:" + odo.getPosition().getY(DistanceUnit.INCH) + " Heading:" +odo.getPosition().getHeading(AngleUnit.DEGREES));
+            telemetry.addData("Pose (ODO)", "X:" + odo.getPosition().getX(DistanceUnit.INCH) + " Y:" + odo.getPosition().getY(DistanceUnit.INCH) + " Heading(non-norm):" + Math.toDegrees(odo.getHeading()) + " Heading(norm):" +odo.getPosition().getHeading(AngleUnit.DEGREES));
         }
 
         telemetry.addData("Slide Distance (CB) (mm) ", slideTofCB.getAverage());
         telemetry.addData("Slide Distance (Direct) (mm) ", tofSlideSensorReading);
         telemetry.addData("Tick Frequency (t/s)", tickFrequency);
         if (autonomousMode || Boolean.TRUE.equals(this.MAP_DEBUG.get(DebugEnum.SENSORS))) {
-            telemetry.addData("Front Distance (US) (mm) ", ultrasonicFrontSensorReading * 10);
-            telemetry.addData("Front Distance (ToF) (mm) ", tofFrontSensorReading);
+            telemetry.addData("Front Distance (US) (mm) ", this.ultrasonicFrontSensorReading);
+            telemetry.addData("Front Distance (ToF) (mm) ", this.tofFrontSensorReading);
 
             telemetry.addData("Claw Color Sensor Distance (mm) ", clawColorSensorDistance);
             telemetry.addData("Claw Color Sensor Red ", clawColorSensorRed);

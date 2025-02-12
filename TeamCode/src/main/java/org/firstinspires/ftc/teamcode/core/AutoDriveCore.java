@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.core;
 import android.util.Log;
 
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.sun.tools.javac.jvm.Gen;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -22,7 +23,8 @@ public class AutoDriveCore extends MechamCore {
     private double desiredXPower = 0.0;
     private double desiredYPower = 0.0;
     private double desiredRxPower = 0.0;
-    private double DROPOFF_PIVOT_DELAY = 0.4;
+    private double distanceBuffer = 3.3;
+    private double DROPOFF_PIVOT_DELAY = 0.01;
     private final ElapsedTime dropoffPivotTimer = new ElapsedTime();
     public MoveToDropoffState moveToDropoffState = MoveToDropoffState.ROTATE_SLIDE_TO_DROPOFF;
     public DropoffState dropoffState = DropoffState.PIVOT_LIFT_ARM;
@@ -30,7 +32,7 @@ public class AutoDriveCore extends MechamCore {
     public AutoDriveState autoDriveState = AutoDriveState.WAITING;
     public StepState stepState = StepState.START;
     private ElapsedTime moveToDropoffTimer = new ElapsedTime();
-    private double MOVE_TO_DROPOFF_DELAY = 0.75;
+    private double MOVE_TO_DROPOFF_DELAY = 0.3;
 
 
     // Center of course is 0, 0
@@ -52,6 +54,7 @@ public class AutoDriveCore extends MechamCore {
         Log.d("FTC-23217-AutoDriveCore", "AutoDriveCore Start. Color:" + teamColor);
         autoDriveState = startMode;
         super.runOpMode();
+        startTimers();
     }
 
     public void workers() throws InterruptedException {
@@ -62,6 +65,10 @@ public class AutoDriveCore extends MechamCore {
         }
     }
 
+    private void startTimers() throws InterruptedException {
+        pickupClawTimer.startTime();
+    }
+
     private void telemetryOutput() throws InterruptedException {
         telemetry.addData("AutoDriveCode: autonomousMode", autonomousMode);
         telemetry.addData("AutoDriveCode: AutoDriveState: ", autoDriveState);
@@ -70,9 +77,6 @@ public class AutoDriveCore extends MechamCore {
         telemetry.addData("AutoDriveCore: desiredXPower: ", desiredXPower);
         telemetry.addData("AutoDriveCore: desiredYPower: ", desiredYPower);
         telemetry.addData("AutoDriveCore: desiredRxPower: ", desiredRxPower);
-    }
-
-    private void updatePreviousPoses(boolean move) throws  InterruptedException {
     }
 
     private void calculateMovementBearing() throws InterruptedException {
@@ -100,10 +104,14 @@ public class AutoDriveCore extends MechamCore {
     }
 
     // Function to break speed into x and y components from bearing
-    public void calculateSpeedComponents() throws InterruptedException {
+    public void calculateSpeedComponents(double slowDistance, double maxSpeed) throws InterruptedException {
         // Convert bearing from degrees to radians
         double radians = Math.toRadians(desiredMovementBearing);
-        double robotHeading = odo.getPosition().getHeading(AngleUnit.RADIANS); // Get robot's current heading
+        double robotHeading = odo.getHeading(); // Get robot's current heading - radians
+        double MIN_SPEED = 0.17;
+        double MIN_DISTANCE = 0;
+        double MAX_DISTANCE = 100;
+
 
         // Adjust bearing relative to the robot's heading
         double adjustedRadians = radians - robotHeading;
@@ -113,35 +121,24 @@ public class AutoDriveCore extends MechamCore {
         double x2 = currentDestination.getX(DistanceUnit.INCH);
         double y2 = currentDestination.getY(DistanceUnit.INCH);
 
+        // Calculate the Euclidean distance to the destination
+        double distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 
-        boolean withIn5 = isXYWithinBuffer(x1, y1, x2, y2, 5);
-        boolean withIn10 = isXYWithinBuffer(x1, y1, x2, y2, 10);
-        boolean withIn20 = isXYWithinBuffer(x1, y1, x2, y2, 20);
-        boolean withIn40 = isXYWithinBuffer(x1, y1, x2, y2, 40);
-        boolean withIn100 = isXYWithinBuffer(x1, y1, x2, y2, 100);
-
-        double desiredSpeed = 0.0;
-        if (withIn5) {
-            desiredSpeed = 0.3;
-        } else if (withIn10) {
-            desiredSpeed = 0.35;
-        } else if (withIn20) {
-            desiredSpeed = 0.5;
-        } else if (withIn40) {
-            desiredSpeed = 0.7;
-        } else if (withIn100) {
-            desiredSpeed = 0.8;
+        // Determine speed based on distance
+        double desiredSpeed;
+        if (distance > slowDistance) {
+            desiredSpeed = maxSpeed;  // Move at max speed when far away
+        } else {
+            // Smoothly reduce speed using an S-curve when within SLOW_DISTANCE
+            double progress = distance / slowDistance;  // Normalize distance to [0,1]
+            // Use a different easing function (e.g., (progress)^2 for more aggressive deceleration)
+            double smoothProgress = 0.5 * (1 - Math.cos(progress * Math.PI)); // Ease-out function
+            desiredSpeed = MIN_SPEED + smoothProgress * (maxSpeed - MIN_SPEED);
         }
 
         // Calculate x and y components of speed
         double xSpeed = desiredSpeed * Math.sin(adjustedRadians);  // x component (horizontal speed)
         double ySpeed = desiredSpeed * Math.cos(adjustedRadians);  // y component (vertical speed)
-
-        // TODO: Make sure this still works now that we are accounting for angle of robot heading.
-        /* if (teamColor == Enum.TeamColor.BLUE) {
-            xSpeed *= -1;
-            ySpeed *= -1;
-        } */
 
         Log.d("FTC-23217-AutoDriveCore", "calculateSpeedComponents: desiredSpeed:" + desiredSpeed + " xSpeed:" + xSpeed + " ySpeed:" + ySpeed);
 
@@ -151,7 +148,7 @@ public class AutoDriveCore extends MechamCore {
     }
 
     private void calculateAngularMovement() throws InterruptedException {
-        double currentAngularBearing = odo.getPosition().getHeading(AngleUnit.DEGREES);
+        double currentAngularBearing = Math.toDegrees(odo.getHeading());
         double currentDesiredAngularBearing = currentDestination.getHeading(AngleUnit.DEGREES);
 
         // Normalize the angles to be within [0, 360)
@@ -168,25 +165,28 @@ public class AutoDriveCore extends MechamCore {
             delta += 360;
         }
 
-        // Determine the direction and the angle to turn
-        double turnAngle = Math.abs(delta);
+        // Define turning parameters
+        double MAX_TURN_SPEED = 0.5;   // Maximum turn speed
+        double MIN_TURN_SPEED = 0.16;  // Minimum turn speed (to prevent jitter)
+        double SLOW_ANGLE = 80;        // Start slowing down when within this angle
 
-        // String direction = delta > 0 ? "right" : "left";
-        if (delta > 60) {
-            desiredRxPower = 0.3;
-        } else if (delta > 20) {
-            desiredRxPower = 0.2;
-        } else if (delta > 0.5) {
-            desiredRxPower = 0.1;
-        } else if (delta < -60) {
-            desiredRxPower = -0.3;
-        } else if (delta < -20) {
-            desiredRxPower = -0.2;
-        } else if (delta < -0.5) {
-            desiredRxPower = -0.1;
-        } else {
-            desiredRxPower = 0.0;
+        // Normalize progress: 1 when far, 0 when close
+        double progress = Math.min(1.0, Math.abs(delta) / SLOW_ANGLE);
+
+        // Apply cosine easing for smooth deceleration
+        double smoothProgress = 0.5 * (1 - Math.cos(progress * Math.PI));
+
+        // Compute desired turn speed
+        double rxPower = MIN_TURN_SPEED + smoothProgress * (MAX_TURN_SPEED - MIN_TURN_SPEED);
+
+        // Apply direction
+        rxPower *= Math.signum(delta);  // Maintain correct left/right turn direction
+
+        // If the angle difference is very small, stop turning
+        if (Math.abs(delta) < 0.5) {
+            rxPower = 0.0;
         }
+        desiredRxPower = rxPower;
 
         if (teamColor == Enum.TeamColor.BLUE) {
             desiredRxPower *= -1;
@@ -197,10 +197,9 @@ public class AutoDriveCore extends MechamCore {
     private boolean atDestination() throws InterruptedException {
         boolean distanceGood = isDistanceGood();
         boolean angleGood = isAngleGood();
-        if (distanceGood && angleGood) {
-            return true;
-        }
-        return false;
+        Log.d("FTC-23217-AutoDriveCore-atDestination", "currentDestination" + currentDestination.toString());
+        Log.d("FTC-23217-AutoDriveCore-atDestination", "distanceGood:" + distanceGood + " angleGood:" + angleGood);
+        return distanceGood && angleGood;
     }
 
     private boolean isXYWithinBuffer(double x1, double y1, double x2, double y2, double buffer) throws InterruptedException {
@@ -229,9 +228,9 @@ public class AutoDriveCore extends MechamCore {
 
     private boolean isAngleGood() throws InterruptedException {
         return isHeadingWithinBuffer(
-                odo.getPosition().getHeading(AngleUnit.DEGREES),
+                Math.toDegrees(odo.getHeading()),
                 currentDestination.getHeading(AngleUnit.DEGREES),
-                4);
+                3);
     }
     private boolean isDistanceGood() throws InterruptedException {
         return isXYWithinBuffer(
@@ -239,33 +238,33 @@ public class AutoDriveCore extends MechamCore {
                     odo.getPosition().getY(DistanceUnit.INCH),
                     currentDestination.getX(DistanceUnit.INCH),
                     currentDestination.getY(DistanceUnit.INCH),
-                   4);
+                    this.distanceBuffer);
     }
 
-    private void calculateMovements(boolean canDirection, boolean canRotate) throws InterruptedException {
+    private void calculateMovements(boolean canDirection, boolean canRotate, boolean reversePower, double slowDistance, double maxSpeed) throws InterruptedException {
         if (!atDestination()) {
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Moving");
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currentX (odo)" + odo.getPosition().getX(DistanceUnit.INCH) + " currentY:" + odo.getPosition().getY(DistanceUnit.INCH));
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: destX" + currentDestination.getX(DistanceUnit.INCH) + " destY:" + currentDestination.getY(DistanceUnit.INCH));
-            Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currHeading (odo)" + odo.getPosition().getHeading(AngleUnit.DEGREES));
+            Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currHeading (odo)" + Math.toDegrees(odo.getHeading()));
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: destHeading" + currentDestination.getHeading(AngleUnit.DEGREES));
 
             if (isDistanceGood()) {
                 Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Distance is good. Stopping movement.");
-                stopMoving(true, false);
+                stopMoving(true, false, reversePower);
             } else {
                 Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Moving.");
                 if (canDirection) {
                     // find direction we need to move
                     calculateMovementBearing();
                     // find x, y power required to move desired direction
-                    calculateSpeedComponents();
+                    calculateSpeedComponents(slowDistance, maxSpeed);
                 }
             }
 
             if (isAngleGood()) {
                 Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Angle is good. Stopping rotation.");
-                stopMoving(false, true);
+                stopMoving(false, true, reversePower);
             } else {
                 Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Rotating.");
                 if (canRotate) {
@@ -282,6 +281,7 @@ public class AutoDriveCore extends MechamCore {
         WAITING,
         DRIVING_HANGING_PARTS_START,
         DRIVING_PARK_START,
+        TESTING,
         DRIVING,
         STOP,
     }
@@ -290,11 +290,11 @@ public class AutoDriveCore extends MechamCore {
         Log.d("FTC-23217-AutoDriveCore", "autoDriveStateMachine: stepState:" + stepState);
         Log.d("FTC-23217-AutoDriveCore", "autoDriveStateMachine: dropoffState:" + dropoffState);
         Log.d("FTC-23217-AutoDriveCore", "autoDriveStateMachine: moveToDropoffState:" + moveToDropoffState);
-        Log.d("FTC-23217-AutoDriveCore", "autoDriveStateMachine: odoX:" + odo.getPosition().getX(DistanceUnit.INCH) + " odoY:" + odo.getPosition().getY(DistanceUnit.INCH) + " odoH:" + odo.getPosition().getHeading(AngleUnit.DEGREES));
-        updatePreviousPoses(true);
+        Log.d("FTC-23217-AutoDriveCore", "autoDriveStateMachine: pickupState:" + pickupState);
+        Log.d("FTC-23217-AutoDriveCore", "autoDriveStateMachine: odoX:" + odo.getPosition().getX(DistanceUnit.INCH) + " odoY:" + odo.getPosition().getY(DistanceUnit.INCH) + " odoH:" + Math.toDegrees(odo.getHeading()));
         switch (autoDriveState) {
             case WAITING:
-                stopMoving(true, true);
+                stopMoving(true, true, false);
                 break;
             case DRIVING_HANGING_PARTS_START:
                 stepState = StepState.NEXT_STEP;
@@ -309,16 +309,33 @@ public class AutoDriveCore extends MechamCore {
             case DRIVING:
                 stepStateMachine();
                 break;
+            case TESTING:
+                stepState = StepState.TESTING;
+                stepStateMachine();
+                break;
             case STOP:
-                stopMoving(true, true);
+                stopMoving(true, true, false);
                 break;
         }
     }
-    private void stopMoving(boolean movement, boolean angle) throws InterruptedException {
+    private void stopMoving(boolean movement, boolean angle, boolean reversePower) throws InterruptedException {
         if (movement) {
             desiredXPower = 0.0;
             desiredYPower = 0.0;
-            stopMovement();
+            if (reversePower) {
+                Pose2D vel = odo.getVelocity();
+                if (vel.getX(DistanceUnit.INCH) > 0.1) {
+                    desiredXPower = -0.05;
+                } else if (vel.getX(DistanceUnit.INCH) < -0.1) {
+                    desiredXPower = 0.05;
+                }
+                if (vel.getY(DistanceUnit.INCH) > 0.1) {
+                    desiredYPower = -0.05;
+                } else if (vel.getY(DistanceUnit.INCH) < -0.1) {
+                    desiredYPower = 0.05;
+                }
+            }
+            // stopMovement();
         }
         if (angle) {
             desiredRxPower = 0.0;
@@ -326,8 +343,17 @@ public class AutoDriveCore extends MechamCore {
     }
 
     private void resetStateMachines() throws InterruptedException {
-        moveToDropoffState = MoveToDropoffState.ROTATE_SLIDE_TO_DROPOFF;
+        switch (pickupState) {
+            case STOP:
+                // just finished pickup
+                moveToDropoffState = MoveToDropoffState.PICKUP_TO_DROP_OFF_TRANSITION;
+                break;
+            default:
+                moveToDropoffState = MoveToDropoffState.ROTATE_SLIDE_TO_DROPOFF;
+                break;
+        }
         dropoffState = DropoffState.PIVOT_LIFT_ARM;
+        pickupState = PickupState.MOVE_TO_WALL;
     }
 
     private void resetComponentMap() throws InterruptedException {
@@ -340,8 +366,9 @@ public class AutoDriveCore extends MechamCore {
 
     private void resetMotorPowerSensorData() throws InterruptedException {
         sensorForDriveControl = ComponentEnum.NONE;
-        zeroMotorPowerSensorValue = 500;
-        maxMotorPowerSensorValue = 100000;
+        zeroMotorPowerSensorValue = 200;
+        maxMotorPowerSensorValue = 300;
+        distanceBuffer = 3.3;
     }
 
     private static final StepState[] TASK_LIST = new StepState[]{
@@ -349,28 +376,17 @@ public class AutoDriveCore extends MechamCore {
             StepState.MOVE_TO_DROPOFF,
             StepState.DROPOFF,
             StepState.PUSH_SPECIMENS,
-            StepState.MOVE_TO_WAYPOINT_ONE_SPECIMEN_ONE,
-            StepState.MOVE_TO_WAYPOINT_TWO_SPECIMEN_ONE,
-            StepState.MOVE_TO_WAYPOINT_THREE_SPECIMEN_ONE,
-            StepState.MOVE_TO_PUSH_SPECIMEN_ONE,
-            StepState.MOVE_TO_WAYPOINT_ONE_SPECIMEN_TWO,
-            StepState.MOVE_TO_WAYPOINT_TWO_SPECIMEN_TWO,
-            StepState.MOVE_TO_PUSH_SPECIMEN_TWO,
-            StepState.MOVE_TO_WAYPOINT_ONE_SPECIMEN_THREE,
-            StepState.MOVE_TO_WAYPOINT_TWO_SPECIMEN_THREE,
-            StepState.MOVE_TO_PUSH_SPECIMEN_THREE,
-            StepState.MOVE_TO_PICKUP_TURN,
-            /* StepState.PICKUP,
+            StepState.PICKUP,
             StepState.MOVE_TO_DROPOFF,
             StepState.DROPOFF,
-            StepState.PICKUP,
+            /*StepState.PICKUP,
             StepState.MOVE_TO_DROPOFF,
             StepState.DROPOFF,
             StepState.PICKUP,
             StepState.MOVE_TO_DROPOFF,
             StepState.DROPOFF,
             StepState.PARK, */
-            StepState.STOP
+            StepState.STOP,
     };
     public enum StepState {
         START,
@@ -381,8 +397,11 @@ public class AutoDriveCore extends MechamCore {
         PICKUP,
         PARK,
         STOP,
+        TESTING,
+        DONE
     }
     public enum GenericMoveStepState {
+        START,
         WAYPOINT_ONE_SPECIMEN_ONE, // Move from dropoff to corner turn to avoid middle structure.
         WAYPOINT_TWO_SPECIMEN_ONE, // Move forward to get behind ground specimens
         WAYPOINT_THREE_SPECIMEN_ONE, // Move to right to get lined up with specimen one.
@@ -393,10 +412,11 @@ public class AutoDriveCore extends MechamCore {
         WAYPOINT_ONE_SPECIMEN_THREE, // Move forward to get behind specimen three. (should be same location as MOVE_TO_WAYPOINT_TWO_SPECIMEN_TWO)
         WAYPOINT_TWO_SPECIMEN_THREE, // Move to right to get lined up with specimen three
         PUSH_SPECIMEN_THREE, // Push specimen three into parking zone
+        WAYPOINT_PRE_PICKUP,
         PICKUP_TURN, // Reset out of the park zone and line up with pickup location. turn around. PICKUP should be after this.
-        NEXT_STEP,
         DONE,
     }
+
     private void stepStateMachine() throws InterruptedException {
         switch (stepState) {
             case START:
@@ -411,6 +431,8 @@ public class AutoDriveCore extends MechamCore {
                 break;
             case MOVE_TO_DROPOFF:
                 MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
+                MAP_COMPONENT.put(ComponentEnum.FRONT_ULTRASONIC_SENSOR, true);
+                distanceBuffer = 6.0;
                 if (moveToDropoffState == MoveToDropoffState.DONE) {
                     stepState = StepState.NEXT_STEP;
                 } else {
@@ -421,213 +443,33 @@ public class AutoDriveCore extends MechamCore {
                 MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
                 MAP_COMPONENT.put(ComponentEnum.FRONT_TOF_SENSOR, true);
 
+                distanceBuffer = 3.3;
                 if (dropoffState == DropoffState.DONE) {
                     stepState = StepState.NEXT_STEP;
                 } else {
                     dropoffStateMachine();
                 }
                 break;
-            case MOVE_TO_WAYPOINT_ONE_SPECIMEN_ONE:
+            case PUSH_SPECIMENS:
                 MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_ONE);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_ONE);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
+                distanceBuffer = 6.0;
+
+                if (pushSpecimensStep == StepState.DONE) {
+                    stepState = StepState.NEXT_STEP;
                 } else {
-                    stepState = StepState.MOVE_TO_WAYPOINT_TWO_SPECIMEN_ONE;
-                }
-                break;
-            case MOVE_TO_WAYPOINT_TWO_SPECIMEN_ONE:
-                MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_ONE);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_ONE);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
-                } else {
-                    stepState = StepState.MOVE_TO_WAYPOINT_THREE_SPECIMEN_ONE;
-                }
-                break;
-            case MOVE_TO_WAYPOINT_THREE_SPECIMEN_ONE:
-                MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.WAYPOINT_THREE_SPECIMEN_ONE);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.WAYPOINT_THREE_SPECIMEN_ONE);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
-                } else {
-                    stepState = StepState.MOVE_TO_PUSH_SPECIMEN_ONE;
-                }
-                break;
-            case MOVE_TO_PUSH_SPECIMEN_ONE:
-                MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.PUSH_SPECIMEN_ONE);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.PUSH_SPECIMEN_ONE);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
-                } else {
-                    stepState = StepState.MOVE_TO_WAYPOINT_ONE_SPECIMEN_TWO;
-                }
-                break;
-            case MOVE_TO_WAYPOINT_ONE_SPECIMEN_TWO:
-                MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_TWO);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_TWO);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
-                } else {
-                    stepState = StepState.MOVE_TO_WAYPOINT_TWO_SPECIMEN_TWO;
-                }
-                break;
-            case MOVE_TO_WAYPOINT_TWO_SPECIMEN_TWO:
-                MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_TWO);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_TWO);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
-                } else {
-                    stepState = StepState.MOVE_TO_PUSH_SPECIMEN_TWO;
-                }
-                break;
-            case MOVE_TO_PUSH_SPECIMEN_TWO:
-                MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.PUSH_SPECIMEN_TWO);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.PUSH_SPECIMEN_TWO);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
-                } else {
-                    stepState = StepState.MOVE_TO_WAYPOINT_ONE_SPECIMEN_THREE;
-                }
-                break;
-            case MOVE_TO_WAYPOINT_ONE_SPECIMEN_THREE:
-                MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_THREE);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.WAYPOINT_ONE_SPECIMEN_THREE);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
-                } else {
-                    stepState = StepState.MOVE_TO_WAYPOINT_TWO_SPECIMEN_THREE;
-                }
-                break;
-            case MOVE_TO_WAYPOINT_TWO_SPECIMEN_THREE:
-                MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_THREE);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.WAYPOINT_TWO_SPECIMEN_THREE);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
-                } else {
-                    stepState = StepState.MOVE_TO_PUSH_SPECIMEN_THREE;
-                }
-                break;
-            case MOVE_TO_PUSH_SPECIMEN_THREE:
-                MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.PUSH_SPECIMEN_THREE);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.PUSH_SPECIMEN_THREE);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
-                } else {
-                    /* switch (teamColor) {
-                        case BLUE:
-                            odo.setPosition(new Pose2D(
-                                    DistanceUnit.INCH,
-                                    -69.0,
-                                    45.7,
-                                    AngleUnit.DEGREES,
-                                    180
-                            ));
-                            break;
-                        case RED:
-                            odo.setPosition(new Pose2D(
-                                    DistanceUnit.INCH,
-                                    69.0,
-                                    -45.7,
-                                    AngleUnit.DEGREES,
-                                    0
-                            ));
-                            break;
-                    }*/
-                    stepState = StepState.MOVE_TO_PICKUP_TURN;
-                }
-                break;
-            case MOVE_TO_PICKUP_TURN:
-                MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
-                switch (teamColor) {
-                    case BLUE:
-                        currentDestination = MAP_BLUE_POSE.get(POSE.PICKUP_TURN);
-                        break;
-                    case RED:
-                        currentDestination = MAP_RED_POSE.get(POSE.PICKUP_TURN);
-                        break;
-                }
-                if (!atDestination()) {
-                    calculateMovements(true, true);
-                } else {
-                    stepState = StepState.STOP;
+                    pushSpecimensStateMachine();
                 }
                 break;
             case PICKUP:
                 MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
                 MAP_COMPONENT.put(ComponentEnum.FRONT_TOF_SENSOR, true);
-                MAP_COMPONENT.put(ComponentEnum.FRONT_ULTRASONIC_SENSOR, true);
                 MAP_COMPONENT.put(ComponentEnum.CLAW_TOUCH_SENSORS, true);
+                distanceBuffer = 3.3;
+                if (pickupState == PickupState.STOP) {
+                    stepState = StepState.NEXT_STEP;
+                } else {
+                    pickupStateMachine();
+                }
                 break;
             case PARK:
                 switch (teamColor) {
@@ -639,11 +481,18 @@ public class AutoDriveCore extends MechamCore {
                         break;
                 }
                 rotationLiftState = RotationLiftState.PARK;
-                // updatePreviousPoses(true);
                 if (atDestination()) {
                     autoDriveState = AutoDriveState.STOP;
                 } else {
-                    calculateMovements(true, true);
+                    calculateMovements(true, true, false, 20, 0.8);
+                }
+                break;
+            case TESTING:
+                currentDestination = MAP_BLUE_POSE.get(POSE.TEST_TURN);
+                if (atDestination()) {
+                    autoDriveState = AutoDriveState.STOP;
+                } else {
+                    calculateMovements(true, true, false, 40, 0.8);
                 }
                 break;
             case STOP:
@@ -655,6 +504,8 @@ public class AutoDriveCore extends MechamCore {
     }
 
     public enum MoveToDropoffState {
+        PICKUP_TO_DROP_OFF_TRANSITION,
+        PICKUP_TO_DROP_OFF_ROTATION,
         ROTATE_SLIDE_TO_DROPOFF,
         MOVE_SLIDE_TO_DROPOFF,
         MOVE_WRIST_TO_DROPOFF,
@@ -665,6 +516,36 @@ public class AutoDriveCore extends MechamCore {
     }
     private void moveToDropoffStateMachine() throws InterruptedException {
        switch (moveToDropoffState) {
+           case PICKUP_TO_DROP_OFF_TRANSITION:
+               switch (teamColor) {
+                   case BLUE:
+                       currentDestination = MAP_BLUE_POSE.get(POSE.PICKUP_TO_DROP_OFF_TRANSITION);
+                       break;
+                   case RED:
+                       currentDestination = MAP_RED_POSE.get(POSE.PICKUP_TO_DROP_OFF_TRANSITION);
+                       break;
+               }
+               if (atDestination()) {
+                   moveToDropoffState = MoveToDropoffState.PICKUP_TO_DROP_OFF_ROTATION;
+                   break;
+               }
+               calculateMovements(true, true, false, 20, 0.8);
+               break;
+           case PICKUP_TO_DROP_OFF_ROTATION:
+               switch (teamColor) {
+                   case BLUE:
+                       currentDestination = MAP_BLUE_POSE.get(POSE.PICKUP_TO_DROP_OFF_ROTATION);
+                       break;
+                   case RED:
+                       currentDestination = MAP_RED_POSE.get(POSE.PICKUP_TO_DROP_OFF_ROTATION);
+                       break;
+               }
+               if (atDestination()) {
+                   moveToDropoffState = MoveToDropoffState.ROTATE_SLIDE_TO_DROPOFF;
+                   break;
+               }
+               calculateMovements(true, true, false, 20, 0.8);
+               break;
            case ROTATE_SLIDE_TO_DROPOFF:
                moveToDropoffTimer.reset();
                rotationLiftState = RotationLiftState.MOVE_TO_DROPOFF;
@@ -677,11 +558,10 @@ public class AutoDriveCore extends MechamCore {
            case MOVE_WRIST_TO_DROPOFF:
                clawPivotState = ClawPivotState.MOVE_TO_DROPOFF;
                if (moveToDropoffTimer.seconds() > MOVE_TO_DROPOFF_DELAY) {
-                   moveToDropoffState = MoveToDropoffState.MOVE_TO_DROPOFF;
+                   moveToDropoffState = MoveToDropoffState.MOVE_TO_DROPOFF_ALIGNMENT;
                }
                break;
            case MOVE_TO_DROPOFF_ALIGNMENT:
-               sensorForDriveControl = ComponentEnum.FRONT_TOF_SENSOR;
                switch (teamColor) {
                    case BLUE:
                        currentDestination = MAP_BLUE_POSE.get(POSE.DROP_OFF_ALIGNMENT);
@@ -691,15 +571,15 @@ public class AutoDriveCore extends MechamCore {
                        break;
                }
                if (!atDestination()) {
-                   zeroMotorPowerSensorValue = 30;
-                   maxMotorPowerSensorValue = 200;
-                   calculateMovements(true, true);
+                   calculateMovements(true, true, true, 40, 0.8);
                } else {
                    moveToDropoffState = MoveToDropoffState.MOVE_TO_DROPOFF;
                }
                break;
            case MOVE_TO_DROPOFF:
-               sensorForDriveControl = ComponentEnum.FRONT_TOF_SENSOR;
+               sensorForDriveControl = ComponentEnum.FRONT_ULTRASONIC_SENSOR;
+               zeroMotorPowerSensorValue = 210;
+               maxMotorPowerSensorValue = 260;
                switch (teamColor) {
                    case BLUE:
                        currentDestination = MAP_BLUE_POSE.get(POSE.DROP_OFF);
@@ -709,9 +589,7 @@ public class AutoDriveCore extends MechamCore {
                        break;
                }
                if (!atDestination()) {
-                   zeroMotorPowerSensorValue = 30;
-                   maxMotorPowerSensorValue = 200;
-                   calculateMovements(true, true);
+                   calculateMovements(true, true, true, 60, 0.8);
                } else {
                    moveToDropoffState = MoveToDropoffState.DONE;
                }
@@ -732,26 +610,6 @@ public class AutoDriveCore extends MechamCore {
     }
     private void dropoffStateMachine() throws InterruptedException {
         switch (dropoffState) {
-            /* case MOVE_TO_ATTACH:
-                switch (teamColor) {
-                    case BLUE:
-                        // currentDestination = POSE_DROPOFF_ATTACH_BLUE;
-                        break;
-                    case RED:
-                        // currentDestination = POSE_DROPOFF_ATTACH_RED;
-                        break;
-                }
-                if (!atDestination()) {
-                    sensorForDriveControl = ComponentEnum.FRONT_TOF_SENSOR;
-                    zeroMotorPowerSensorValue = 30;
-                    maxMotorPowerSensorValue = 200;
-                    calculateMovements(true, false);
-                } else {
-                    stopMoving(true, true);
-                    resetMotorPowerSensorData();
-                    dropoffState = DropoffState.PIVOT_LIFT_ARM;
-                }
-                break; */
             case PIVOT_LIFT_ARM:
                 rotationLiftState = RotationLiftState.DROPOFF;
                 dropoffState = DropoffState.PIVOTING_LIFT_ARM;
@@ -783,7 +641,7 @@ public class AutoDriveCore extends MechamCore {
                         break;
                 }
                 if (!atDestination()) {
-                    calculateMovements(true, true);
+                    calculateMovements(true, true, false, 20, 0.9);
                 } else {
                     dropoffState = DropoffState.DONE;
                 }
@@ -791,5 +649,95 @@ public class AutoDriveCore extends MechamCore {
             case DONE:
                 break;
         }
+    }
+
+    private static final GenericMoveStepState[] PUSH_SPECIMEN_TASK_LIST = new GenericMoveStepState[]{
+        GenericMoveStepState.WAYPOINT_ONE_SPECIMEN_ONE, // Move from dropoff to corner turn to avoid middle structure.
+        GenericMoveStepState.WAYPOINT_TWO_SPECIMEN_ONE, // Move forward to get behind ground specimens
+        GenericMoveStepState.WAYPOINT_THREE_SPECIMEN_ONE, // Move to right to get lined up with specimen one.
+        GenericMoveStepState.PUSH_SPECIMEN_ONE, // Push specimen one into parking zone
+        GenericMoveStepState.WAYPOINT_ONE_SPECIMEN_TWO, // Move forward to get behind specimens (should be same location as MOVE_TO_WAYPOINT_THREE_SPECIMEN_ONE)
+        GenericMoveStepState.WAYPOINT_TWO_SPECIMEN_TWO, // Move to right to get lined up with specimen two
+        GenericMoveStepState.PUSH_SPECIMEN_TWO, // Push specimen two into parking zone
+        GenericMoveStepState.WAYPOINT_ONE_SPECIMEN_THREE, // Move forward to get behind specimen three. (should be same location as MOVE_TO_WAYPOINT_TWO_SPECIMEN_TWO)
+        GenericMoveStepState.WAYPOINT_TWO_SPECIMEN_THREE, // Move to right to get lined up with specimen three
+        GenericMoveStepState.PUSH_SPECIMEN_THREE, // Push specimen three into parking zone
+        GenericMoveStepState.WAYPOINT_PRE_PICKUP, // Push specimen three into parking zone
+        GenericMoveStepState.PICKUP_TURN, // Reset out of the park zone and line up with pickup location. turn around. PICKUP should be after this.
+        GenericMoveStepState.DONE,
+    };
+    private StepState pushSpecimensStep = StepState.PUSH_SPECIMENS;
+    private int currentPushSpecimensStep = 0;
+    private void pushSpecimensStateMachine() throws InterruptedException {
+        switch (pushSpecimensStep) {
+            case PUSH_SPECIMENS:
+                if (PUSH_SPECIMEN_TASK_LIST[currentPushSpecimensStep] == GenericMoveStepState.DONE) {
+                    pushSpecimensStep = StepState.DONE;
+                } else {
+                    switch (teamColor) {
+                        case BLUE:
+                            currentDestination = MAP_BLUE_STEP_POSE.get(PUSH_SPECIMEN_TASK_LIST[currentPushSpecimensStep]);
+                            break;
+                        case RED:
+                            currentDestination = MAP_RED_STEP_POSE.get(PUSH_SPECIMEN_TASK_LIST[currentPushSpecimensStep]);
+                            break;
+                    }
+                    if (!atDestination()) {
+                        calculateMovements(true, true, false, 20, 1.0);
+                    } else {
+                        pushSpecimensStep = StepState.NEXT_STEP;
+                    }
+                }
+                break;
+            case NEXT_STEP:
+                currentPushSpecimensStep += 1;
+                pushSpecimensStep = StepState.PUSH_SPECIMENS;
+                break;
+            case DONE:
+                break;
+        }
+    }
+
+    public enum PickupState {
+        MOVE_TO_WALL,
+        CLOSE_CLAW,
+        STOP;
+    }
+    public PickupState pickupState = PickupState.MOVE_TO_WALL;
+    private ElapsedTime pickupClawTimer = new ElapsedTime();
+    private final double PICKUP_CLAW_DELAY = 0.4;
+
+
+    private void pickupStateMachine() throws InterruptedException {
+        switch (pickupState) {
+            case MOVE_TO_WALL:
+                zeroMotorPowerSensorValue = 190;
+                maxMotorPowerSensorValue = 290;
+                switch (teamColor) {
+                    case BLUE:
+                        currentDestination = MAP_BLUE_POSE.get(POSE.PICKUP);
+                        break;
+                    case RED:
+                        currentDestination = MAP_RED_POSE.get(POSE.PICKUP);
+                        break;
+                }
+                if (isClawTouching /* || atDestination()*/) {
+                    // claw is touching, move on!
+                    pickupState = PickupState.CLOSE_CLAW;
+                    pickupClawTimer.reset();
+                    break;
+                }
+                calculateMovements(true, true, true, 60, 0.8);
+                break;
+            case CLOSE_CLAW:
+                clawState = ClawState.CLOSE;
+                if (pickupClawTimer.seconds() > PICKUP_CLAW_DELAY) {
+                    pickupState = PickupState.STOP;
+                }
+                break;
+            case STOP:
+                break;
+        }
+
     }
 }
