@@ -9,7 +9,7 @@ public class MechamCore extends TelemetryCore {
     private final double FRONT_RIGHT_ADJUSTMENT = 1.02;
     private final double FRONT_LEFT_ADJUSTMENT = 1.01;
     private final double REAR_RIGHT_ADJUSTMENT = 1.02;
-    private final double REAR_LEFT_ADJUSTMENT = 1.04;
+    private final double REAR_LEFT_ADJUSTMENT = 1.02;
     public boolean isMoving = false;
 
     @Override
@@ -35,10 +35,10 @@ public class MechamCore extends TelemetryCore {
         rearRightMotor.setPower(0.0);
     }
 
-    private void autoMechamMovement(double x, double y, double rx) throws InterruptedException {
+    /* private void autoMechamMovement(double x, double y, double rx) throws InterruptedException {
         double fixedY = -y;
         double fixedX = -x;
-        double fixedRx = -rx;
+        double fixedRx = rx;
 
         // Denominator is the largest motor power (absolute value) or 1
         // This ensures all the powers maintain the same ratio,
@@ -50,6 +50,9 @@ public class MechamCore extends TelemetryCore {
         // ✅ Prevents movement distortion when moving diagonally or rotating at the same time.
         double magnitude = Math.sqrt(fixedY * fixedY + fixedX * fixedX + fixedRx * fixedRx);
         double denominator = Math.max(magnitude, 1);  // Prevents division by zero
+        // double translationMagnitude = Math.sqrt(fixedY * fixedY + fixedX * fixedX);
+        // double rotationWeight = 0.5;  // Reduce rotation strength relative to translation
+        // double denominator = Math.max(translationMagnitude + Math.abs(fixedRx) * rotationWeight, 1);
 
 
         isMoving = (y != 0 || x != 0 || rx != 0);
@@ -72,7 +75,39 @@ public class MechamCore extends TelemetryCore {
             frontRightMotor.setPower(frontRightPower);
             rearRightMotor.setPower(rearRightPower);
         }
+    } */
+
+    private void autoMechamMovement(double x, double y, double rx) throws InterruptedException {
+        double fixedY = -y;
+        double fixedX = -x;
+        double fixedRx = -rx * 0.6; // Removed negation
+
+        // Normalize movement with lower weight for rotation
+        double translationMagnitude = Math.sqrt(fixedY * fixedY + fixedX * fixedX);
+        double rotationWeight = 0.5;  // Reduce rotation strength relative to translation
+        double denominator = Math.max(translationMagnitude + Math.abs(fixedRx) * rotationWeight, 1);
+
+        isMoving = (y != 0 || x != 0 || rx != 0);
+
+        double powerReduction = getPowerReduction();
+        Log.d("FTC-23217-autoMechamMovement", "isMoving:" + isMoving + " x:" + fixedX + " y:" + fixedY + " rx:" + fixedRx + " powerReduction:" + powerReduction);
+
+        double frontLeftPower = sigmoidPowerCurve(-(fixedY + fixedX + fixedRx) / denominator) * FRONT_LEFT_ADJUSTMENT;
+        double rearLeftPower = sigmoidPowerCurve((fixedY - fixedX + fixedRx) / denominator) * REAR_LEFT_ADJUSTMENT;
+        double frontRightPower = sigmoidPowerCurve(-(fixedY - fixedX - fixedRx) / denominator) * FRONT_RIGHT_ADJUSTMENT;
+        double rearRightPower = sigmoidPowerCurve((fixedY + fixedX - fixedRx) / denominator) * REAR_RIGHT_ADJUSTMENT;
+
+        Log.d("FTC-23217-autoMechamMovement", "frontLeftPower:" + frontLeftPower + " rearLeftPower:" + rearLeftPower +
+                " frontRightPower:" + frontRightPower + " rearRightPower:" + rearRightPower);
+
+        if (this.autonomousMode && Boolean.TRUE.equals(this.MAP_DEBUG.get(DebugEnum.DRIVE_MOTORS))) {
+            frontLeftMotor.setPower(frontLeftPower);
+            rearLeftMotor.setPower(rearLeftPower);
+            frontRightMotor.setPower(frontRightPower);
+            rearRightMotor.setPower(rearRightPower);
+        }
     }
+
 
     private double getPowerReduction() {
         double powerReduction = 1;
@@ -108,12 +143,6 @@ public class MechamCore extends TelemetryCore {
         double x = -gamepad1.left_stick_x;
         double rx = -gamepad1.right_stick_x * right_stick_x_reducer;
         double rt = gamepad1.right_trigger;
-        if (rt > 0.03) {
-            // turbo mode
-            powerReduction = rt;
-        } else {
-            powerReduction = 0.6;
-        }
 
         isMoving = (y != 0 || x != 0 || rx != 0);
 
@@ -142,13 +171,14 @@ public class MechamCore extends TelemetryCore {
         }
     }
 
-    private Double powerCurve(Double power) throws InterruptedException {
-        return Math.pow(power, 3) * powerReduction;
-    }
-
     private Double sigmoidPowerCurve(Double power) throws InterruptedException {
-        double a = 5.0; // Adjusts how aggressively the curve smooths (higher = sharper)
+        double a = 3.0; // Adjusts how aggressively the curve smooths (higher = sharper)
 
-        return Math.signum(power) * ((1 / (1 + Math.exp(-a * Math.abs(power)))) - 0.5) * 2 * powerReduction;
+        // Compute sigmoid function
+        double sigmoid = (1 / (1 + Math.exp(-a * Math.abs(power)))) - 0.5;
+        double output = Math.signum(power) * sigmoid * 2 * powerReduction;
+
+        // Ensure the output is clamped to [-1, 1]
+        return Math.max(-1.0, Math.min(1.0, output));
     }
 }

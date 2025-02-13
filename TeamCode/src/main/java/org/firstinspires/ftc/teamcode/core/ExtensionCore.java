@@ -14,7 +14,7 @@ public class ExtensionCore extends CameraCore {
     public SLIDE_STATE slideState = SLIDE_STATE.HOLDING;
     public final short SLIDE_MIN = 168;
     public final short SLIDE_MIN_SLOW = 178;
-    public final short SLIDE_HOOKER_MIN_SLOW = 245;
+    public final short SLIDE_HOOKER_MIN_SLOW = 240;
     public final short SLIDE_HOOKER_MIN = SLIDE_HOOKER_MIN_SLOW + 20; // Jeremy named this variable.
     public final short SLIDE_HOOKER_MAX = SLIDE_HOOKER_MIN + 5; // Jeremy named this variable.
     public final short SLIDE_HOOKER_MAX_SLOW = SLIDE_HOOKER_MAX + 20;
@@ -44,13 +44,13 @@ public class ExtensionCore extends CameraCore {
         MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
         if (tofSlideSensorReading < SLIDE_HOOKER_MIN_SLOW) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move up fast ");
-            slideMotor.setPower(0.9);
+            slideMotor.setPower(0.85);
         } else if (tofSlideSensorReading < SLIDE_HOOKER_MIN) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move up slow ");
-            slideMotor.setPower(0.25);
+            slideMotor.setPower(0.2);
         } else if  (tofSlideSensorReading > SLIDE_HOOKER_MAX_SLOW ) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move down fast ");
-            slideMotor.setPower(-0.6);
+            slideMotor.setPower(-0.8);
         } else if (tofSlideSensorReading > SLIDE_HOOKER_MAX) {
             Log.d("FTC-23217-ExtensionCore", "moveToDropoff: Move down slow ");
             slideMotor.setPower(-0.15);
@@ -67,16 +67,16 @@ public class ExtensionCore extends CameraCore {
             slideState = SLIDE_STATE.HOLDING;
         } else if (tofSlideSensorReading > SLIDE_PICKUP_SLOW_MAX) {
             // too high, can move fast down
-            slideMotor.setPower(-0.6);
+            slideMotor.setPower(-0.8);
         } else if (tofSlideSensorReading > SLIDE_PICKUP_HOOKER_MAX) {
             // too high, in slow zone. move slow down
             slideMotor.setPower(-0.15);
         } else if (tofSlideSensorReading < SLIDE_PICKUP_SLOW_MIN) {
             // too low, can move fast up
-            slideMotor.setPower(0.9);
+            slideMotor.setPower(0.85);
         } else if (tofSlideSensorReading < SLIDE_PICKUP_HOOKER_MIN) {
             // too low, in slow zone. move slow up
-            slideMotor.setPower(0.25);
+            slideMotor.setPower(0.2);
         } else {
             slideState = SLIDE_STATE.HOLDING;
         }

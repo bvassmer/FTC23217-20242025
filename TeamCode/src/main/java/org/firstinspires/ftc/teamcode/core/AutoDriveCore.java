@@ -24,7 +24,15 @@ public class AutoDriveCore extends MechamCore {
     private double desiredYPower = 0.0;
     private double desiredRxPower = 0.0;
     private double distanceBuffer = 3.3;
-    private double DROPOFF_PIVOT_DELAY = 0.01;
+    private double DROPOFF_PIVOT_DELAY = 0.2;
+    double kP = 0.003; // Reduce aggressive correction was 0.008
+    double kI = 0.00003;
+    double kD = 0.003; // Reduce oscillation was 0.003
+
+
+    double previousError = 0;
+    double integralSum = 0;
+    double maxTurnSpeed = 0.5; // Prevent excessive rotation speed
     private final ElapsedTime dropoffPivotTimer = new ElapsedTime();
     public MoveToDropoffState moveToDropoffState = MoveToDropoffState.ROTATE_SLIDE_TO_DROPOFF;
     public DropoffState dropoffState = DropoffState.PIVOT_LIFT_ARM;
@@ -103,15 +111,12 @@ public class AutoDriveCore extends MechamCore {
         desiredMovementBearing = movementBearing;
     }
 
-    // Function to break speed into x and y components from bearing
+    /* // Function to break speed into x and y components from bearing
     public void calculateSpeedComponents(double slowDistance, double maxSpeed) throws InterruptedException {
         // Convert bearing from degrees to radians
         double radians = Math.toRadians(desiredMovementBearing);
         double robotHeading = odo.getHeading(); // Get robot's current heading - radians
         double MIN_SPEED = 0.17;
-        double MIN_DISTANCE = 0;
-        double MAX_DISTANCE = 100;
-
 
         // Adjust bearing relative to the robot's heading
         double adjustedRadians = radians - robotHeading;
@@ -131,7 +136,6 @@ public class AutoDriveCore extends MechamCore {
         } else {
             // Smoothly reduce speed using an S-curve when within SLOW_DISTANCE
             double progress = distance / slowDistance;  // Normalize distance to [0,1]
-            // Use a different easing function (e.g., (progress)^2 for more aggressive deceleration)
             double smoothProgress = 0.5 * (1 - Math.cos(progress * Math.PI)); // Ease-out function
             desiredSpeed = MIN_SPEED + smoothProgress * (maxSpeed - MIN_SPEED);
         }
@@ -147,7 +151,7 @@ public class AutoDriveCore extends MechamCore {
         desiredYPower = ySpeed;
     }
 
-    private void calculateAngularMovement() throws InterruptedException {
+     private void calculateAngularMovement(double maxSpeed) throws InterruptedException {
         double currentAngularBearing = Math.toDegrees(odo.getHeading());
         double currentDesiredAngularBearing = currentDestination.getHeading(AngleUnit.DEGREES);
 
@@ -167,8 +171,8 @@ public class AutoDriveCore extends MechamCore {
 
         // Define turning parameters
         double MAX_TURN_SPEED = 0.5;   // Maximum turn speed
-        double MIN_TURN_SPEED = 0.16;  // Minimum turn speed (to prevent jitter)
-        double SLOW_ANGLE = 80;        // Start slowing down when within this angle
+        double MIN_TURN_SPEED = 0.19;  // Minimum turn speed (to prevent jitter)
+        double SLOW_ANGLE = 70;        // Start slowing down when within this angle
 
         // Normalize progress: 1 when far, 0 when close
         double progress = Math.min(1.0, Math.abs(delta) / SLOW_ANGLE);
@@ -180,7 +184,17 @@ public class AutoDriveCore extends MechamCore {
         double rxPower = MIN_TURN_SPEED + smoothProgress * (MAX_TURN_SPEED - MIN_TURN_SPEED);
 
         // Apply direction
-        rxPower *= Math.signum(delta);  // Maintain correct left/right turn direction
+        rxPower *= Math.signum(delta);
+
+        /* // Scale rotation by translational movement strength (prevents rotation from overpowering)
+        double translationalSpeed = Math.sqrt(desiredXPower * desiredXPower + desiredYPower * desiredYPower);
+        rxPower *= Math.min(1.0, translationalSpeed / maxSpeed); // Ensures rotation is not dominant
+
+        // If the angle difference is very small, stop turning
+        if (Math.abs(delta) < 0.5) {
+            rxPower = 0.0;
+        }
+        desiredRxPower = rxPower; //
 
         // If the angle difference is very small, stop turning
         if (Math.abs(delta) < 0.5) {
@@ -188,11 +202,164 @@ public class AutoDriveCore extends MechamCore {
         }
         desiredRxPower = rxPower;
 
-        if (teamColor == Enum.TeamColor.BLUE) {
+        /* if (teamColor == Enum.TeamColor.BLUE) {
             desiredRxPower *= -1;
         }
         Log.d("FTC-23217-AutoDriveCore", "calculateAngularMovement: delta:" + delta + " desiredRxPower:" + desiredRxPower);
+    } */
+
+    /* private void calculateAngularMovement() throws InterruptedException {
+        double currentAngularBearing = Math.toDegrees(odo.getHeading());
+        double currentDesiredAngularBearing = currentDestination.getHeading(AngleUnit.DEGREES);
+
+        // Normalize angles
+        currentAngularBearing = (currentAngularBearing + 360) % 360;
+        currentDesiredAngularBearing = (currentDesiredAngularBearing + 360) % 360;
+
+        // Calculate error (difference between desired and current heading)
+        double error = currentDesiredAngularBearing - currentAngularBearing;
+
+        // Normalize error to range [-180, 180]
+        if (error > 180) {
+            error -= 360;
+        } else if (error < -180) {
+            error += 360;
+        }
+
+        // PID Calculations
+        integralSum += error;  // Accumulate error over time (Integral)
+        double derivative = error - previousError;  // Change in error (Derivative)
+        previousError = error;  // Store current error for next cycle
+
+        // Compute PID output (rxPower)
+        double rxPower = (kP * error) + (kI * integralSum) + (kD * derivative);
+
+        // Limit rxPower to prevent excessive rotation speed
+        rxPower = Math.max(-maxTurnSpeed, Math.min(maxTurnSpeed, rxPower));
+
+        // Apply rotation adjustment
+        desiredRxPower = rxPower;
+
+        Log.d("FTC-23217-AutoDriveCore-calculateAngularMovement", "PID Rotation: error=" + error + " rxPower=" + rxPower);
+    } */
+
+    private double getDistanceToTarget(double x1, double y1, double x2, double y2) throws InterruptedException {
+        return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
     }
+
+    public void calculateSpeedComponents(double slowDistance, double maxSpeed) throws InterruptedException {
+        double MIN_SPEED = 0.23;
+
+        // Get current position from odometry
+        Pose2D currentPose = odo.getPosition();
+        double x1 = currentPose.getX(DistanceUnit.INCH);
+        double y1 = currentPose.getY(DistanceUnit.INCH);
+        double heading = currentPose.getHeading(AngleUnit.RADIANS); // Convert heading to radians
+
+        // Get target position
+        double x2 = currentDestination.getX(DistanceUnit.INCH);
+        double y2 = currentDestination.getY(DistanceUnit.INCH);
+
+        // Compute distance to target
+        double distance = getDistanceToTarget(x1, y1, x2, y2);
+
+        // Adjust speed based on distance
+        double desiredSpeed;
+        if (distance > slowDistance) {
+            desiredSpeed = maxSpeed;
+        } else {
+            double progress = distance / slowDistance;
+            double smoothProgress = 0.5 * (1 - Math.cos(progress * Math.PI));
+            desiredSpeed = MIN_SPEED + smoothProgress * (maxSpeed - MIN_SPEED);
+        }
+
+        // Reduce speed if rotation is strong
+        /* double rotationFactor = Math.max(0.3, 1.0 - Math.abs(desiredRxPower) * 2.0);
+        desiredSpeed *= rotationFactor; */
+        double rotationFactor = Math.max(0.5, 1.0 - Math.abs(desiredRxPower) * 1.5); // ✅ Less aggressive reduction
+        desiredSpeed *= rotationFactor;
+
+        // Compute absolute movement direction (from current to destination)
+        double movementAngle = Math.atan2(y2 - y1, x2 - x1); // Field-centric angle
+
+        // Convert to robot-centric using current heading
+        double relativeAngle = movementAngle - heading; // Adjust for robot frame
+
+        // ✅ FIX: Swap sin and cos to correctly map motion
+        double xSpeed = desiredSpeed * Math.cos(relativeAngle); // Cos for x (strafe)
+        double ySpeed = desiredSpeed * Math.sin(relativeAngle); // Sin for y (forward/backward)
+
+        desiredXPower = xSpeed;
+        desiredYPower = ySpeed;
+
+        Log.d("FTC-23217-AutoDriveCore", "Speed: " + desiredSpeed + " xSpeed:" + xSpeed + " ySpeed:" + ySpeed + " rotationFactor:" + rotationFactor);
+    }
+
+    private void calculateAngularMovement() throws InterruptedException {
+        double currentAngularBearing = Math.toDegrees(odo.getHeading());
+        double currentDesiredAngularBearing = currentDestination.getHeading(AngleUnit.DEGREES);
+
+        // Get current position from odometry
+        Pose2D currentPose = odo.getPosition();
+        double x1 = currentPose.getX(DistanceUnit.INCH);
+        double y1 = currentPose.getY(DistanceUnit.INCH);
+
+        // Get target position
+        double x2 = currentDestination.getX(DistanceUnit.INCH);
+        double y2 = currentDestination.getY(DistanceUnit.INCH);
+
+        // Compute distance to target
+        double distanceToTarget = getDistanceToTarget(x1, y1, x2, y2);
+
+        Log.d("FTC-23217-AutoDriveCore-calculateAngularMovement",
+                "Pre-Normalized currentAngularBearing=" + currentAngularBearing +
+                        " currentDesiredAngularBearing:" + currentDesiredAngularBearing);
+
+        // Normalize angles
+        currentAngularBearing = (currentAngularBearing + 360) % 360;
+        currentDesiredAngularBearing = (currentDesiredAngularBearing + 360) % 360;
+
+        // Calculate error
+        double error = currentDesiredAngularBearing - currentAngularBearing;
+
+        // Normalize error to range [-180, 180]
+        if (error > 180) error -= 360;
+        if (error < -180) error += 360;
+
+        double WINDUP_GUARD = 10.0;
+        // **Fix 1: Integral Windup Guard** (Limit accumulation to prevent excessive rotation)
+        if (Math.abs(error) > WINDUP_GUARD) { // Only accumulate if error is reasonable
+            integralSum = 0;
+        } else {
+            integralSum += error;
+        }
+
+        // **Fix 2: Adjust Rotation Scaling for Long Movements**
+        double distanceFactor = Math.min(1.0, distanceToTarget / 10.0); // Scale for long movements // changed from 20
+        double adjustedKP = kP * distanceFactor; // Reduce P effect for long distances
+
+        // Compute PID output
+        double derivative = error - previousError;
+        previousError = error;
+        double rxPower = (adjustedKP * error) + (kI * integralSum) + (kD * derivative);
+
+        // **Fix 3: Smoothly Reduce Rotation Near Target**
+        double closeToTargetFactor = Math.max(0.2, Math.min(1.0, Math.abs(error) / WINDUP_GUARD));
+        rxPower *= closeToTargetFactor;
+
+        // Clamp rxPower
+        rxPower = Math.max(-maxTurnSpeed, Math.min(maxTurnSpeed, rxPower));
+
+        if (Math.abs(rxPower) < 0.05) {
+            rxPower = 0.0;
+        }
+
+        desiredRxPower = rxPower;
+
+        Log.d("FTC-23217-AutoDriveCore-calculateAngularMovement",
+                "PID Rotation: error=" + error + " rxPower=" + rxPower);
+    }
+
 
     private boolean atDestination() throws InterruptedException {
         boolean distanceGood = isDistanceGood();
@@ -249,8 +416,22 @@ public class AutoDriveCore extends MechamCore {
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: currHeading (odo)" + Math.toDegrees(odo.getHeading()));
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: destHeading" + currentDestination.getHeading(AngleUnit.DEGREES));
 
+            if (isAngleGood()) {
+                Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Angle is good. Stopping rotation.");
+                calculateAngularMovement();
+                stopMoving(false, true, reversePower);
+            } else {
+                Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Rotating.");
+                if (canRotate) {
+                    // find power required to rotate to desired bearing
+                    calculateAngularMovement();
+                }
+            }
+
             if (isDistanceGood()) {
                 Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Distance is good. Stopping movement.");
+                calculateMovementBearing();
+                calculateSpeedComponents(slowDistance, maxSpeed);
                 stopMoving(true, false, reversePower);
             } else {
                 Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Moving.");
@@ -262,16 +443,6 @@ public class AutoDriveCore extends MechamCore {
                 }
             }
 
-            if (isAngleGood()) {
-                Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Angle is good. Stopping rotation.");
-                stopMoving(false, true, reversePower);
-            } else {
-                Log.d("FTC-23217-AutoDriveCore", "calculateMovements: Rotating.");
-                if (canRotate) {
-                    // find power required to rotate to desired bearing
-                    calculateAngularMovement();
-                }
-            }
         } else {
             Log.d("FTC-23217-AutoDriveCore", "calculateMovements: At Destination!");
         }
@@ -492,7 +663,7 @@ public class AutoDriveCore extends MechamCore {
                 if (atDestination()) {
                     autoDriveState = AutoDriveState.STOP;
                 } else {
-                    calculateMovements(true, true, false, 40, 0.8);
+                    calculateMovements(true, true, false, 40, 1.0);
                 }
                 break;
             case STOP:
