@@ -113,7 +113,9 @@ public class DataCore extends HardwareCore {
                     { POSE.PICKUP_TO_DROP_OFF_TRANSITION, new Pose2D(DistanceUnit.INCH, -32, 42, AngleUnit.DEGREES, 0)},
                     { POSE.PICKUP_TO_DROP_OFF_ROTATION, new Pose2D(DistanceUnit.INCH, -32, 42, AngleUnit.DEGREES, 180)},
                     { POSE.PARK, new Pose2D(DistanceUnit.INCH, -70, 46, AngleUnit.DEGREES, 180)},
-                    { POSE.WAYPOINT_ONE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -43, 35, AngleUnit.DEGREES, 180)},
+
+                    // PUSH SPECIMENS
+                    { POSE.WAYPOINT_ONE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -43, 36, AngleUnit.DEGREES, 180)},
                     { POSE.WAYPOINT_TWO_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -43, 3, AngleUnit.DEGREES, 180)},
                     { POSE.WAYPOINT_THREE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -49, 3, AngleUnit.DEGREES, 180)},
                     { POSE.PUSH_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -49, 46, AngleUnit.DEGREES, 180)},
@@ -123,6 +125,8 @@ public class DataCore extends HardwareCore {
                     { POSE.WAYPOINT_ONE_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, -60, 3, AngleUnit.DEGREES, 180)},
                     { POSE.WAYPOINT_TWO_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, -66, 3, AngleUnit.DEGREES, 180)},
                     { POSE.PUSH_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, -66, 46, AngleUnit.DEGREES, 180)},
+
+                    // TESTING
                     { POSE.TEST_START, new Pose2D(DistanceUnit.INCH, -21.25, 56, AngleUnit.DEGREES, 180)},
                     { POSE.TEST_TURN, new Pose2D(DistanceUnit.INCH, -45, 35, AngleUnit.DEGREES, 270)},
             })
@@ -155,7 +159,9 @@ public class DataCore extends HardwareCore {
                     { POSE.PICKUP_TO_DROP_OFF_TRANSITION, new Pose2D(DistanceUnit.INCH, 32, -42, AngleUnit.DEGREES, 180)},
                     { POSE.PICKUP_TO_DROP_OFF_ROTATION, new Pose2D(DistanceUnit.INCH, 32, -42, AngleUnit.DEGREES, 0)},
                     { POSE.PARK, new Pose2D(DistanceUnit.INCH, 70, -46, AngleUnit.DEGREES, 0)},
-                    { POSE.WAYPOINT_ONE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 42, -35, AngleUnit.DEGREES, 0)},
+
+                    // PUSH SPECIMENS
+                    { POSE.WAYPOINT_ONE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 42, -36, AngleUnit.DEGREES, 0)},
                     { POSE.WAYPOINT_TWO_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 42, -3, AngleUnit.DEGREES, 0)},
                     { POSE.WAYPOINT_THREE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 49, -3, AngleUnit.DEGREES, 0)},
                     { POSE.PUSH_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 49, -46, AngleUnit.DEGREES, 0)},
@@ -164,6 +170,8 @@ public class DataCore extends HardwareCore {
                     { POSE.PUSH_SPECIMEN_TWO, new Pose2D(DistanceUnit.INCH, 60, -46, AngleUnit.DEGREES, 0)},
                     { POSE.WAYPOINT_ONE_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, 60, -3, AngleUnit.DEGREES, 0)},
                     { POSE.WAYPOINT_TWO_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, 66, -3, AngleUnit.DEGREES, 0)},
+
+                    // TESTING
                     { POSE.PUSH_SPECIMEN_THREE, new Pose2D(DistanceUnit.INCH, 66, -46, AngleUnit.DEGREES, 0)},
                     { POSE.TEST_START, new Pose2D(DistanceUnit.INCH, 60, -36, AngleUnit.DEGREES, 0)},
                     { POSE.TEST_TURN, new Pose2D(DistanceUnit.INCH, 60, -36, AngleUnit.DEGREES, 180)},
