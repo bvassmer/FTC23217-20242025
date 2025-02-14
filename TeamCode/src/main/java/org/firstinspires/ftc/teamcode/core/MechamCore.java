@@ -3,7 +3,7 @@ package org.firstinspires.ftc.teamcode.core;
 import android.util.Log;
 
 public class MechamCore extends TelemetryCore {
-    private Double powerReduction = 0.7;
+    public Double sigmoidPowerReduction = 0.7;
     // ADJUSTMENT values are calibration values to overcome differences in friction and other factors
     // at the four motors in the robot.
     private final double FRONT_RIGHT_ADJUSTMENT = 1.02;
@@ -80,12 +80,12 @@ public class MechamCore extends TelemetryCore {
     private void autoMechamMovement(double x, double y, double rx) throws InterruptedException {
         double fixedY = -y;
         double fixedX = -x;
-        double fixedRx = -rx * 0.6; // Removed negation
+        double fixedRx = rx * 0.6; // Removed negation
 
         // Normalize movement with lower weight for rotation
         double translationMagnitude = Math.sqrt(fixedY * fixedY + fixedX * fixedX);
-        double rotationWeight = 0.5;  // Reduce rotation strength relative to translation
-        double denominator = Math.max(translationMagnitude + Math.abs(fixedRx) * rotationWeight, 1);
+        double rotationWeight = 0.3;  // Reduce rotation strength relative to translation
+        double denominator = Math.max(translationMagnitude + Math.abs(fixedRx) * rotationWeight, 0.8);
 
         isMoving = (y != 0 || x != 0 || rx != 0);
 
@@ -138,6 +138,7 @@ public class MechamCore extends TelemetryCore {
 
     private void mechamMovement() throws InterruptedException {
         double right_stick_x_reducer = 1.0;
+        sigmoidPowerReduction = 0.7;
 
         double y = gamepad1.left_stick_y;
         double x = -gamepad1.left_stick_x;
@@ -176,7 +177,7 @@ public class MechamCore extends TelemetryCore {
 
         // Compute sigmoid function
         double sigmoid = (1 / (1 + Math.exp(-a * Math.abs(power)))) - 0.5;
-        double output = Math.signum(power) * sigmoid * 2 * powerReduction;
+        double output = Math.signum(power) * sigmoid * 2 * sigmoidPowerReduction;
 
         // Ensure the output is clamped to [-1, 1]
         return Math.max(-1.0, Math.min(1.0, output));

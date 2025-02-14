@@ -25,14 +25,15 @@ public class AutoDriveCore extends MechamCore {
     private double desiredRxPower = 0.0;
     private double distanceBuffer = 3.3;
     private double DROPOFF_PIVOT_DELAY = 0.2;
-    double kP = 0.003; // Reduce aggressive correction was 0.008
+    private double previousDerivative = 0.0;
+    double kP = 0.016; // Reduce aggressive correction was 0.008
     double kI = 0.00003;
-    double kD = 0.003; // Reduce oscillation was 0.003
+    double kD = 0.001; // Reduce oscillation was 0.003
 
 
     double previousError = 0;
     double integralSum = 0;
-    double maxTurnSpeed = 0.5; // Prevent excessive rotation speed
+    double maxTurnSpeed = 1.0; // Prevent excessive rotation speed
     private final ElapsedTime dropoffPivotTimer = new ElapsedTime();
     public MoveToDropoffState moveToDropoffState = MoveToDropoffState.ROTATE_SLIDE_TO_DROPOFF;
     public DropoffState dropoffState = DropoffState.PIVOT_LIFT_ARM;
@@ -40,7 +41,6 @@ public class AutoDriveCore extends MechamCore {
     public AutoDriveState autoDriveState = AutoDriveState.WAITING;
     public StepState stepState = StepState.START;
     private ElapsedTime moveToDropoffTimer = new ElapsedTime();
-    private double MOVE_TO_DROPOFF_DELAY = 0.3;
 
 
     // Center of course is 0, 0
@@ -276,7 +276,7 @@ public class AutoDriveCore extends MechamCore {
         // Reduce speed if rotation is strong
         /* double rotationFactor = Math.max(0.3, 1.0 - Math.abs(desiredRxPower) * 2.0);
         desiredSpeed *= rotationFactor; */
-        double rotationFactor = Math.max(0.5, 1.0 - Math.abs(desiredRxPower) * 1.5); // ✅ Less aggressive reduction
+        double rotationFactor = Math.max(0.9, 1.0 - Math.abs(desiredRxPower) * 1.3); // ✅ Less aggressive reduction
         desiredSpeed *= rotationFactor;
 
         // Compute absolute movement direction (from current to destination)
@@ -296,69 +296,69 @@ public class AutoDriveCore extends MechamCore {
     }
 
     private void calculateAngularMovement() throws InterruptedException {
-        double currentAngularBearing = Math.toDegrees(odo.getHeading());
+        // ✅ Use normalized heading directly
+        double currentAngularBearing = odo.getPosition().getHeading(AngleUnit.DEGREES);
         double currentDesiredAngularBearing = currentDestination.getHeading(AngleUnit.DEGREES);
 
-        // Get current position from odometry
+        // ✅ Compute distance to target
         Pose2D currentPose = odo.getPosition();
         double x1 = currentPose.getX(DistanceUnit.INCH);
         double y1 = currentPose.getY(DistanceUnit.INCH);
-
-        // Get target position
         double x2 = currentDestination.getX(DistanceUnit.INCH);
         double y2 = currentDestination.getY(DistanceUnit.INCH);
-
-        // Compute distance to target
         double distanceToTarget = getDistanceToTarget(x1, y1, x2, y2);
 
         Log.d("FTC-23217-AutoDriveCore-calculateAngularMovement",
-                "Pre-Normalized currentAngularBearing=" + currentAngularBearing +
-                        " currentDesiredAngularBearing:" + currentDesiredAngularBearing);
+                "Normalized currentAngularBearing=" + currentAngularBearing +
+                        " currentDesiredAngularBearing=" + currentDesiredAngularBearing);
 
-        // Normalize angles
-        currentAngularBearing = (currentAngularBearing + 360) % 360;
-        currentDesiredAngularBearing = (currentDesiredAngularBearing + 360) % 360;
-
-        // Calculate error
+        // ✅ Calculate error & ensure it's within [-180, 180]
         double error = currentDesiredAngularBearing - currentAngularBearing;
-
-        // Normalize error to range [-180, 180]
         if (error > 180) error -= 360;
         if (error < -180) error += 360;
 
-        double WINDUP_GUARD = 10.0;
-        // **Fix 1: Integral Windup Guard** (Limit accumulation to prevent excessive rotation)
-        if (Math.abs(error) > WINDUP_GUARD) { // Only accumulate if error is reasonable
-            integralSum = 0;
-        } else {
-            integralSum += error;
-        }
+        Log.d("FTC-23217-AutoDriveCore-calculateAngularMovement",
+                "Pre PID Error: " + error);
 
-        // **Fix 2: Adjust Rotation Scaling for Long Movements**
-        double distanceFactor = Math.min(1.0, distanceToTarget / 10.0); // Scale for long movements // changed from 20
-        double adjustedKP = kP * distanceFactor; // Reduce P effect for long distances
+        /* double WINDUP_GUARD = 120.0;
+
+        // ✅ Capped integral accumulation (instead of full reset)
+        integralSum += error;
+        integralSum = Math.max(-WINDUP_GUARD, Math.min(WINDUP_GUARD, integralSum)); */
+
+        // ✅ Smoothed D-term to prevent jitter
+        double rawDerivative = error - previousError;
+        double derivative = (0.7 * rawDerivative) + (0.3 * previousDerivative);
+        previousError = error;
+        previousDerivative = derivative; // Store for next cycle
 
         // Compute PID output
-        double derivative = error - previousError;
-        previousError = error;
-        double rxPower = (adjustedKP * error) + (kI * integralSum) + (kD * derivative);
+        double rxPower = (kP * error) + (kI * integralSum) + (kD * derivative);
 
-        // **Fix 3: Smoothly Reduce Rotation Near Target**
-        double closeToTargetFactor = Math.max(0.2, Math.min(1.0, Math.abs(error) / WINDUP_GUARD));
-        rxPower *= closeToTargetFactor;
+        // ✅ New: Adjust turn power based on **distance to target**
+        /* double distanceFactor = Math.min(1.0, distanceToTarget / 2.0); // Adjust denominator to tune sensitivity
 
-        // Clamp rxPower
+        // ✅ New: Keep rotation power high if far away, reduce if close
+        double closeToTargetFactor = Math.max(1.0, Math.min(1.0, Math.abs(error) / WINDUP_GUARD)); */
+
+        // rxPower *= closeToTargetFactor * distanceFactor; // Scale by both angle and distance
+
+        // ✅ Clamp rxPower
         rxPower = Math.max(-maxTurnSpeed, Math.min(maxTurnSpeed, rxPower));
 
-        if (Math.abs(rxPower) < 0.05) {
+        /* if (Math.abs(rxPower) < 0.08) {
             rxPower = 0.0;
-        }
+        } */
 
         desiredRxPower = rxPower;
 
         Log.d("FTC-23217-AutoDriveCore-calculateAngularMovement",
-                "PID Rotation: error=" + error + " rxPower=" + rxPower);
+                "PID Rotation: error=" + error + " rxPower=" + rxPower /*+
+                        " closeToTargetFactor=" + closeToTargetFactor +
+                        " distanceFactor=" + distanceFactor*/);
     }
+
+
 
 
     private boolean atDestination() throws InterruptedException {
@@ -375,20 +375,23 @@ public class AutoDriveCore extends MechamCore {
     }
 
     private boolean isHeadingWithinBuffer(double headingToCheck, double targetHeading, double buffer) throws InterruptedException {
-        // Normalize all angles to be between 0 and 360 degrees
-        headingToCheck = (headingToCheck + 360) % 360;
-        targetHeading = (targetHeading + 360) % 360;
+        // ✅ Normalize angles to range [-180, 180]
+        headingToCheck = ((headingToCheck + 180) % 360 + 360) % 360 - 180;
+        targetHeading = ((targetHeading + 180) % 360 + 360) % 360 - 180;
 
-        // Calculate the lower and upper bounds of the range
-        double lowerBound = (targetHeading - buffer + 360) % 360;
-        double upperBound = (targetHeading + buffer) % 360;
+        // ✅ Compute the buffer range
+        double lowerBound = targetHeading - buffer;
+        double upperBound = targetHeading + buffer;
 
-        // Check if the number is within the range
+        // ✅ Normalize bounds to [-180, 180]
+        lowerBound = ((lowerBound + 180) % 360 + 360) % 360 - 180;
+        upperBound = ((upperBound + 180) % 360 + 360) % 360 - 180;
+        Log.d("FTC-23217-AutoDriveCore-isHeadingWithinBuffer", "headingToCheck:" + headingToCheck + " targetHeading:" + targetHeading + " lowerBound:" + lowerBound + " upperBound:" + upperBound);
+
+        // ✅ Handle wraparound cases correctly
         if (lowerBound <= upperBound) {
-            // Normal range (no wraparound)
             return headingToCheck >= lowerBound && headingToCheck <= upperBound;
         } else {
-            // Range wraps around 360
             return headingToCheck >= lowerBound || headingToCheck <= upperBound;
         }
     }
@@ -491,38 +494,36 @@ public class AutoDriveCore extends MechamCore {
     }
     private void stopMoving(boolean movement, boolean angle, boolean reversePower) throws InterruptedException {
         if (movement) {
+            Log.d("FTC-23217-AutoDriveCore-stopMoving", "Stop Movement.");
             desiredXPower = 0.0;
             desiredYPower = 0.0;
             if (reversePower) {
                 Pose2D vel = odo.getVelocity();
                 if (vel.getX(DistanceUnit.INCH) > 0.1) {
+                    Log.d("FTC-23217-AutoDriveCore-stopMoving", "Reversing X -Power.");
                     desiredXPower = -0.05;
                 } else if (vel.getX(DistanceUnit.INCH) < -0.1) {
+                    Log.d("FTC-23217-AutoDriveCore-stopMoving", "Reversing X +Power.");
                     desiredXPower = 0.05;
                 }
                 if (vel.getY(DistanceUnit.INCH) > 0.1) {
+                    Log.d("FTC-23217-AutoDriveCore-stopMoving", "Reversing Y -Power.");
                     desiredYPower = -0.05;
                 } else if (vel.getY(DistanceUnit.INCH) < -0.1) {
+                    Log.d("FTC-23217-AutoDriveCore-stopMoving", "Reversing Y +Power.");
                     desiredYPower = 0.05;
                 }
             }
             // stopMovement();
         }
         if (angle) {
+            Log.d("FTC-23217-AutoDriveCore-stopMoving", "Stopping Angular Power.");
             desiredRxPower = 0.0;
         }
     }
 
     private void resetStateMachines() throws InterruptedException {
-        switch (pickupState) {
-            case STOP:
-                // just finished pickup
-                moveToDropoffState = MoveToDropoffState.PICKUP_TO_DROP_OFF_TRANSITION;
-                break;
-            default:
-                moveToDropoffState = MoveToDropoffState.ROTATE_SLIDE_TO_DROPOFF;
-                break;
-        }
+        moveToDropoffState = MoveToDropoffState.ROTATE_SLIDE_TO_DROPOFF;
         dropoffState = DropoffState.PIVOT_LIFT_ARM;
         pickupState = PickupState.MOVE_TO_WALL;
     }
@@ -544,15 +545,18 @@ public class AutoDriveCore extends MechamCore {
 
     private static final StepState[] TASK_LIST = new StepState[]{
             StepState.START,
-            StepState.MOVE_TO_DROPOFF,
-            StepState.DROPOFF,
+            StepState.MOVE_TO_DROP_OFF,
+            StepState.DROP_OFF,
             StepState.PUSH_SPECIMENS,
             StepState.PICKUP,
-            StepState.MOVE_TO_DROPOFF,
-            StepState.DROPOFF,
+            StepState.PICKUP_TO_DROP_OFF,
+            StepState.MOVE_TO_DROP_OFF,
+            StepState.DROP_OFF,
+            StepState.DROP_OFF_TO_PICKUP,
             /*StepState.PICKUP,
             StepState.MOVE_TO_DROPOFF,
             StepState.DROPOFF,
+            StepState.MOVE_TO_PICKUP,
             StepState.PICKUP,
             StepState.MOVE_TO_DROPOFF,
             StepState.DROPOFF,
@@ -562,18 +566,19 @@ public class AutoDriveCore extends MechamCore {
     public enum StepState {
         START,
         NEXT_STEP,
-        MOVE_TO_DROPOFF,
-        DROPOFF,
+        MOVE_TO_DROP_OFF,
+        DROP_OFF_TO_PICKUP,
+        DROP_OFF,
         PUSH_SPECIMENS,
         PICKUP,
+        PICKUP_TO_DROP_OFF,
         PARK,
         STOP,
         TESTING,
         DONE
     }
     public enum GenericMoveStepState {
-        START,
-        WAYPOINT_ONE_SPECIMEN_ONE, // Move from dropoff to corner turn to avoid middle structure.
+        WAYPOINT_ONE_SPECIMEN_ONE, // Move from drop off to corner turn to avoid middle structure.
         WAYPOINT_TWO_SPECIMEN_ONE, // Move forward to get behind ground specimens
         WAYPOINT_THREE_SPECIMEN_ONE, // Move to right to get lined up with specimen one.
         PUSH_SPECIMEN_ONE, // Push specimen one into parking zone
@@ -600,17 +605,17 @@ public class AutoDriveCore extends MechamCore {
                 resetMotorPowerSensorData();
                 stepState = TASK_LIST[currentTaskStep];
                 break;
-            case MOVE_TO_DROPOFF:
+            case MOVE_TO_DROP_OFF:
                 MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
                 MAP_COMPONENT.put(ComponentEnum.FRONT_ULTRASONIC_SENSOR, true);
                 distanceBuffer = 6.0;
                 if (moveToDropoffState == MoveToDropoffState.DONE) {
                     stepState = StepState.NEXT_STEP;
                 } else {
-                    moveToDropoffStateMachine();
+                    moveToDropOffStateMachine();
                 }
                 break;
-            case DROPOFF:
+            case DROP_OFF:
                 MAP_COMPONENT.put(ComponentEnum.SLIDE_TOF_SENSOR, true);
                 MAP_COMPONENT.put(ComponentEnum.FRONT_TOF_SENSOR, true);
 
@@ -619,6 +624,21 @@ public class AutoDriveCore extends MechamCore {
                     stepState = StepState.NEXT_STEP;
                 } else {
                     dropoffStateMachine();
+                }
+                break;
+            case DROP_OFF_TO_PICKUP:
+                switch (teamColor) {
+                    case BLUE:
+                        currentDestination = MAP_BLUE_POSE.get(POSE.DROP_OFF_TO_PICKUP_TRANSITION);
+                        break;
+                    case RED:
+                        currentDestination = MAP_RED_POSE.get(POSE.DROP_OFF_TO_PICKUP_TRANSITION);
+                        break;
+                }
+                if (atDestination()) {
+                    stepState = StepState.NEXT_STEP;
+                } else {
+                    calculateMovements(true, true, false, 20, 0.8);
                 }
                 break;
             case PUSH_SPECIMENS:
@@ -640,6 +660,21 @@ public class AutoDriveCore extends MechamCore {
                     stepState = StepState.NEXT_STEP;
                 } else {
                     pickupStateMachine();
+                }
+                break;
+            case PICKUP_TO_DROP_OFF:
+                switch (teamColor) {
+                    case BLUE:
+                        currentDestination = MAP_BLUE_POSE.get(POSE.PICKUP_TO_DROP_OFF_TRANSITION);
+                        break;
+                    case RED:
+                        currentDestination = MAP_RED_POSE.get(POSE.PICKUP_TO_DROP_OFF_TRANSITION);
+                        break;
+                }
+                if (atDestination()) {
+                    stepState = StepState.NEXT_STEP;
+                } else {
+                    calculateMovements(true, true, false, 20, 0.8);
                 }
                 break;
             case PARK:
@@ -675,8 +710,6 @@ public class AutoDriveCore extends MechamCore {
     }
 
     public enum MoveToDropoffState {
-        PICKUP_TO_DROP_OFF_TRANSITION,
-        PICKUP_TO_DROP_OFF_ROTATION,
         ROTATE_SLIDE_TO_DROPOFF,
         MOVE_SLIDE_TO_DROPOFF,
         MOVE_WRIST_TO_DROPOFF,
@@ -685,38 +718,9 @@ public class AutoDriveCore extends MechamCore {
         DONE,
 
     }
-    private void moveToDropoffStateMachine() throws InterruptedException {
-       switch (moveToDropoffState) {
-           case PICKUP_TO_DROP_OFF_TRANSITION:
-               switch (teamColor) {
-                   case BLUE:
-                       currentDestination = MAP_BLUE_POSE.get(POSE.PICKUP_TO_DROP_OFF_TRANSITION);
-                       break;
-                   case RED:
-                       currentDestination = MAP_RED_POSE.get(POSE.PICKUP_TO_DROP_OFF_TRANSITION);
-                       break;
-               }
-               if (atDestination()) {
-                   moveToDropoffState = MoveToDropoffState.PICKUP_TO_DROP_OFF_ROTATION;
-                   break;
-               }
-               calculateMovements(true, true, false, 20, 0.8);
-               break;
-           case PICKUP_TO_DROP_OFF_ROTATION:
-               switch (teamColor) {
-                   case BLUE:
-                       currentDestination = MAP_BLUE_POSE.get(POSE.PICKUP_TO_DROP_OFF_ROTATION);
-                       break;
-                   case RED:
-                       currentDestination = MAP_RED_POSE.get(POSE.PICKUP_TO_DROP_OFF_ROTATION);
-                       break;
-               }
-               if (atDestination()) {
-                   moveToDropoffState = MoveToDropoffState.ROTATE_SLIDE_TO_DROPOFF;
-                   break;
-               }
-               calculateMovements(true, true, false, 20, 0.8);
-               break;
+    private void moveToDropOffStateMachine() throws InterruptedException {
+        double MOVE_TO_DROP_OFF_DELAY = 0.3;
+        switch (moveToDropoffState) {
            case ROTATE_SLIDE_TO_DROPOFF:
                moveToDropoffTimer.reset();
                rotationLiftState = RotationLiftState.MOVE_TO_DROPOFF;
@@ -728,7 +732,7 @@ public class AutoDriveCore extends MechamCore {
                break;
            case MOVE_WRIST_TO_DROPOFF:
                clawPivotState = ClawPivotState.MOVE_TO_DROPOFF;
-               if (moveToDropoffTimer.seconds() > MOVE_TO_DROPOFF_DELAY) {
+               if (moveToDropoffTimer.seconds() > MOVE_TO_DROP_OFF_DELAY) {
                    moveToDropoffState = MoveToDropoffState.MOVE_TO_DROPOFF_ALIGNMENT;
                }
                break;
@@ -854,7 +858,7 @@ public class AutoDriveCore extends MechamCore {
                             break;
                     }
                     if (!atDestination()) {
-                        calculateMovements(true, true, false, 20, 1.0);
+                        calculateMovements(true, true, false, 10, 1.0);
                     } else {
                         pushSpecimensStep = StepState.NEXT_STEP;
                     }
@@ -876,8 +880,7 @@ public class AutoDriveCore extends MechamCore {
     }
     public PickupState pickupState = PickupState.MOVE_TO_WALL;
     private ElapsedTime pickupClawTimer = new ElapsedTime();
-    private final double PICKUP_CLAW_DELAY = 0.4;
-
+    private final double PICKUP_CLAW_DELAY = 0.35;
 
     private void pickupStateMachine() throws InterruptedException {
         switch (pickupState) {
