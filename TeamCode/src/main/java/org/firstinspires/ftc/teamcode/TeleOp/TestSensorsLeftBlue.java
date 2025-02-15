@@ -8,10 +8,10 @@ import org.firstinspires.ftc.teamcode.Enum;
 import org.firstinspires.ftc.teamcode.core.AutoDriveCore;
 
 @TeleOp
-public class TestSensorsBlue extends AutoDriveCore {
+public class TestSensorsLeftBlue extends AutoDriveCore {
     public void runOpMode() throws InterruptedException {
         Log.d("FTC-23217", "TestSensors Start.");
-        this.courseSide = CourseSide.RIGHT;
+        this.courseSide = CourseSide.LEFT;
         this.autonomousMode = false;
         this.teamColor = Enum.TeamColor.BLUE;
         this.enableController = false;

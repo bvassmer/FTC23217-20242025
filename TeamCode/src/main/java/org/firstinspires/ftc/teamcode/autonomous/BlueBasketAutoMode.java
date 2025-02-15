@@ -6,12 +6,15 @@ import org.firstinspires.ftc.teamcode.Enum;
 import org.firstinspires.ftc.teamcode.core.AutoDriveCore;
 
 @Autonomous(group = "autonomousModes")
-public class RedAutoMode extends AutoDriveCore {
+public class BlueBasketAutoMode extends AutoDriveCore {
     public void runOpMode() throws InterruptedException {
+        this.courseSide = CourseSide.LEFT;
         this.autonomousMode = true;
-        this.startAngle = 0.0;
+        this.startAngle = 180.0;
         this.enableController = false;
-        this.teamColor = Enum.TeamColor.RED;
+        this.teamColor = Enum.TeamColor.BLUE;
+        this.movementLockOn = false;
+        parkOnly = false;
         this.MAP_DEBUG.put(DebugEnum.DRIVE_MOTORS, true);
         super.runOpMode(AutoDriveState.DRIVING_HANGING_PARTS_START);
         waitForStart();

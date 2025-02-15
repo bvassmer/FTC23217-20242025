@@ -33,15 +33,19 @@ public class LiftCore extends ExtensionCore {
     final Double ROTATION_STEP = 1.0 / 360.0;
     final Double SAFE_LIFT_ROTATION_FRONT = 0.255;
     final Double SAFE_LIFT_REVERSE_ROTATION_FRONT = 0.73;
-    final Double SAFE_LIFT_ROTATION_BACK = 0.58;
-    final Double SAFE_LIFT_REVERSE_ROTATION_BACK = 0.41;
+    final Double SAFE_LIFT_ROTATION_BACK = 0.5328;
+    final Double SAFE_LIFT_REVERSE_ROTATION_BACK = 0.4572;
+    final Double UNSAFE_LIFT_ROTATION_BACK = 0.58;
+    final Double UNSAFE_LIFT_REVERSE_ROTATION_BACK = 0.41;
+    private Double liftRotationBack = 0.5328;
+    private Double liftRotationReverseBack = 0.41;
     final double CLAW_OPEN_POSITION = 0.6;
     public final double SLIDE_PICKUP_HOOKER_LIFT_ROTATION = 0.3922;
     public final double SLIDE_PICKUP_HOOKER_LIFT_REVERSE_ROTATION = 0.5928;
     public final double SLIDE_DROPOFF_HOOKER_LIFT_ROTATION = 0.415; // 0.47 old
     public final double SLIDE_DROPOFF_HOOKER_LIFT_REVERSE_ROTATION = 0.57; // 0.52 old
-    public final double SLIDE_DROPOFF_RELEASE_HOOKER_LIFT_ROTATION = 0.40;
-    public final double SLIDE_DROPIFF_RELEASE_HOOKER_LIFT_REVERSE_ROTATION = 0.60;
+    public final double SLIDE_DROPOFF_RELEASE_HOOKER_LIFT_ROTATION = 0.39;
+    public final double SLIDE_DROPIFF_RELEASE_HOOKER_LIFT_REVERSE_ROTATION = 0.61;
     public final double LIFT_ROTATION_PARK = 0.56;
     public final double LIFT_ROTATION_PARK_REVERSE = 0.43;
 
@@ -52,10 +56,20 @@ public class LiftCore extends ExtensionCore {
 
     protected void workers() throws InterruptedException {
         super.workers();
+        setLimits();
         rotationStateMachine();
         startTimers();
     }
 
+    private void setLimits() throws InterruptedException {
+        if (movementLockOn) {
+            liftRotationBack = SAFE_LIFT_ROTATION_BACK;
+            liftRotationReverseBack = SAFE_LIFT_REVERSE_ROTATION_BACK;
+        } else {
+            liftRotationBack = UNSAFE_LIFT_ROTATION_BACK;
+            liftRotationReverseBack = UNSAFE_LIFT_REVERSE_ROTATION_BACK;
+        }
+    }
     private void startTimers() throws InterruptedException {
         rotationTimer.startTime();
     }
@@ -94,8 +108,8 @@ public class LiftCore extends ExtensionCore {
                 break;
             case MOVE_TO_MAX_BACK:
                 rotationTimer.reset();
-                liftPivotServoPosition = SAFE_LIFT_ROTATION_BACK;
-                liftPivotServoReversePosition = SAFE_LIFT_REVERSE_ROTATION_BACK;
+                liftPivotServoPosition = liftRotationBack;
+                liftPivotServoReversePosition = liftRotationReverseBack;
                 liftPivotServo.setPosition(liftPivotServoPosition);
                 liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
                 rotationLiftState = RotationLiftState.MOVING;
@@ -110,14 +124,14 @@ public class LiftCore extends ExtensionCore {
                 break;
             case MOVE_TO_BACK:
                 rotationTimer.reset();
-                if (liftPivotServoPosition + ROTATION_STEP < SAFE_LIFT_ROTATION_BACK) {
+                if (liftPivotServoPosition + ROTATION_STEP < liftRotationBack) {
                     // SAFE, so allow movement
-                    liftPivotServoPosition = liftPivotServoPosition +ROTATION_STEP;
+                    liftPivotServoPosition = liftPivotServoPosition + ROTATION_STEP;
                     liftPivotServoReversePosition = liftPivotServoReversePosition - ROTATION_STEP;
                     liftPivotServo.setPosition(liftPivotServoPosition);
                     liftPivotServoReverse.setPosition(liftPivotServoReversePosition);
                     rotationLiftState = RotationLiftState.MOVING;
-                } else if (liftPivotServoPosition + ROTATION_STEP >= SAFE_LIFT_ROTATION_BACK) {
+                } else if (liftPivotServoPosition + ROTATION_STEP >= liftRotationBack) {
                     // NOT SAFE, reset to MAX BACK.
                     rotationLiftState = RotationLiftState.MOVE_TO_MAX_BACK;
                 }
@@ -153,6 +167,9 @@ public class LiftCore extends ExtensionCore {
                 /* if (liftPivotServoPosition != null && (liftPivotServoPosition < SLIDE_DROPOFF_RELEASE_HOOKER_LIFT_ROTATION  || liftPivotServoReversePosition > SLIDE_DROPIFF_RELEASE_HOOKER_LIFT_REVERSE_ROTATION)) {
                     slideState = SLIDE_STATE.AUTO_PICKUP;
                 } */
+                if (isOutsideBoundaries()) {
+                    slideState = SLIDE_STATE.FIX_OUTSIDE_BOUNDARIES;
+                }
                 if (rotationTimer.seconds() > ROTATION_TIME) {
                     rotationLiftState = RotationLiftState.WAITING;
                 }

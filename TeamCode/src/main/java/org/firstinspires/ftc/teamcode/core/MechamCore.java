@@ -6,10 +6,10 @@ public class MechamCore extends TelemetryCore {
     private Double powerReduction = 0.7;
     // ADJUSTMENT values are calibration values to overcome differences in friction and other factors
     // at the four motors in the robot.
-    private final double FRONT_RIGHT_ADJUSTMENT = 1.02;
-    private final double FRONT_LEFT_ADJUSTMENT = 1.01;
-    private final double REAR_RIGHT_ADJUSTMENT = 1.02;
-    private final double REAR_LEFT_ADJUSTMENT = 1.02;
+    private final double FRONT_RIGHT_ADJUSTMENT = 1.03;
+    private final double FRONT_LEFT_ADJUSTMENT = 1.03;
+    private final double REAR_RIGHT_ADJUSTMENT = 1.00;
+    private final double REAR_LEFT_ADJUSTMENT = 1.00;
     public boolean isMoving = false;
 
     @Override
@@ -92,10 +92,14 @@ public class MechamCore extends TelemetryCore {
         double powerReduction = getPowerReduction();
         Log.d("FTC-23217-autoMechamMovement", "isMoving:" + isMoving + " x:" + fixedX + " y:" + fixedY + " rx:" + fixedRx + " powerReduction:" + powerReduction);
 
-        double frontLeftPower = sigmoidPowerCurve(-(fixedY + fixedX + fixedRx) / denominator) * FRONT_LEFT_ADJUSTMENT;
+        /* double frontLeftPower = sigmoidPowerCurve(-(fixedY + fixedX + fixedRx) / denominator) * FRONT_LEFT_ADJUSTMENT;
         double rearLeftPower = sigmoidPowerCurve((fixedY - fixedX + fixedRx) / denominator) * REAR_LEFT_ADJUSTMENT;
         double frontRightPower = sigmoidPowerCurve(-(fixedY - fixedX - fixedRx) / denominator) * FRONT_RIGHT_ADJUSTMENT;
-        double rearRightPower = sigmoidPowerCurve((fixedY + fixedX - fixedRx) / denominator) * REAR_RIGHT_ADJUSTMENT;
+        double rearRightPower = sigmoidPowerCurve((fixedY + fixedX - fixedRx) / denominator) * REAR_RIGHT_ADJUSTMENT; */
+        double frontLeftPower = -(fixedY + fixedX + fixedRx) / denominator * FRONT_LEFT_ADJUSTMENT;
+        double rearLeftPower = (fixedY - fixedX + fixedRx) / denominator * REAR_LEFT_ADJUSTMENT;
+        double frontRightPower = -(fixedY - fixedX - fixedRx) / denominator * FRONT_RIGHT_ADJUSTMENT;
+        double rearRightPower = (fixedY + fixedX - fixedRx) / denominator * REAR_RIGHT_ADJUSTMENT;
 
         Log.d("FTC-23217-autoMechamMovement", "frontLeftPower:" + frontLeftPower + " rearLeftPower:" + rearLeftPower +
                 " frontRightPower:" + frontRightPower + " rearRightPower:" + rearRightPower);
@@ -137,7 +141,7 @@ public class MechamCore extends TelemetryCore {
     }
 
     private void mechamMovement() throws InterruptedException {
-        double right_stick_x_reducer = 1.0;
+        double right_stick_x_reducer = 0.6;
 
         double y = gamepad1.left_stick_y;
         double x = -gamepad1.left_stick_x;
@@ -172,11 +176,10 @@ public class MechamCore extends TelemetryCore {
     }
 
     private Double sigmoidPowerCurve(Double power) throws InterruptedException {
-        double a = 3.0; // Adjusts how aggressively the curve smooths (higher = sharper)
+        double a = 3.0; // Adjusts steepness of the curve
+        double sigmoid = (2 / (1 + Math.exp(-a * power))) - 1; // ✅ Keeps range symmetrical [-1, 1]
 
-        // Compute sigmoid function
-        double sigmoid = (1 / (1 + Math.exp(-a * Math.abs(power)))) - 0.5;
-        double output = Math.signum(power) * sigmoid * 2 * powerReduction;
+        double output = sigmoid * powerReduction; // ✅ Apply power reduction consistently
 
         // Ensure the output is clamped to [-1, 1]
         return Math.max(-1.0, Math.min(1.0, output));

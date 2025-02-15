@@ -2,6 +2,8 @@ package org.firstinspires.ftc.teamcode.core;
 
 import android.util.Log;
 
+import androidx.annotation.VisibleForTesting;
+
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
@@ -17,6 +19,12 @@ import java.util.stream.Stream;
 
 public class DataCore extends HardwareCore {
     public boolean isMoving = false;
+    public enum CourseSide{
+        LEFT,
+        RIGHT,
+    }
+    public CourseSide courseSide = CourseSide.RIGHT;
+    protected boolean movementLockOn = true;
     protected Enum.TeamColor teamColor = Enum.TeamColor.BLUE;
     protected boolean autonomousMode = false;
     protected boolean enableController = false;
@@ -102,6 +110,32 @@ public class DataCore extends HardwareCore {
         TEST_START,
         TEST_TURN,
     }
+
+    protected final Map<POSE, Pose2D> MAP_BLUE_LEFT_POSE = Stream.of(new Object[][] {
+            { POSE.START, new Pose2D(DistanceUnit.INCH, 21.25, 56, AngleUnit.DEGREES, 270)},
+       /*     { POSE.TO_BASKET, new Pose2D(DistanceUnit.INCH, 42, 49, AngleUnit.DEGREES, 270)},
+            { POSE.BASKET_TURN, new Pose2D(DistanceUnit.INCH, 42, 49, AngleUnit.DEGREES, 225)},
+
+
+*/
+            // TESTING
+            { POSE.TEST_START, new Pose2D(DistanceUnit.INCH, 21.25, 56, AngleUnit.DEGREES, 270)},
+            { POSE.TEST_TURN, new Pose2D(DistanceUnit.INCH, 45, 35, AngleUnit.DEGREES, 180)},
+            })
+            .collect(Collectors.toMap(data -> (POSE) data[0], data -> (Pose2D) data[1]));
+
+    protected final Map<POSE, Pose2D> MAP_RED_LEFT_POSE = Stream.of(new Object[][] {
+                { POSE.START, new Pose2D(DistanceUnit.INCH, -21.25, -56, AngleUnit.DEGREES, 270)},
+                /*  { POSE.BASKET_DROP, new Pose2D(DistanceUnit.INCH, 40, 53, AngleUnit.DEGREES, 90)},
+                 { POSE.BASKET_TURN, new Pose2D(DistanceUnit.INCH, 40, 56, AngleUnit.DEGREES, 180)},
+                 { POSE.WAYPOINT_ONE_SAMPLE_ONE, new Pose2D(DistanceUnit.INCH, 25, 3, AngleUnit.DEGREES, 180)},
+
+         */
+                // TESTING
+                { POSE.TEST_START, new Pose2D(DistanceUnit.INCH, -21.25, -56, AngleUnit.DEGREES, 90)},
+                { POSE.TEST_TURN, new Pose2D(DistanceUnit.INCH, -45, -35, AngleUnit.DEGREES, 180)},
+            })
+            .collect(Collectors.toMap(data -> (POSE) data[0], data -> (Pose2D) data[1]));
     protected final Map<POSE, Pose2D> MAP_BLUE_POSE = Stream.of(new Object[][] {
                     { POSE.START, new Pose2D(DistanceUnit.INCH, -21.25, 56, AngleUnit.DEGREES, 180)},
                     { POSE.DROP_OFF_ALIGNMENT, new Pose2D(DistanceUnit.INCH, -6, 42, AngleUnit.DEGREES, 180)},
@@ -112,7 +146,7 @@ public class DataCore extends HardwareCore {
                     { POSE.PICKUP, new Pose2D(DistanceUnit.INCH, -54, 49, AngleUnit.DEGREES, 0)},
                     { POSE.PICKUP_TO_DROP_OFF_TRANSITION, new Pose2D(DistanceUnit.INCH, -32, 42, AngleUnit.DEGREES, 0)},
                     { POSE.PICKUP_TO_DROP_OFF_ROTATION, new Pose2D(DistanceUnit.INCH, -32, 42, AngleUnit.DEGREES, 180)},
-                    { POSE.PARK, new Pose2D(DistanceUnit.INCH, -70, 46, AngleUnit.DEGREES, 180)},
+                    { POSE.PARK, new Pose2D(DistanceUnit.INCH, -66, 50, AngleUnit.DEGREES, 180)},
 
                     // PUSH SPECIMENS
                     { POSE.WAYPOINT_ONE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, -43, 36, AngleUnit.DEGREES, 180)},
@@ -158,7 +192,7 @@ public class DataCore extends HardwareCore {
                     { POSE.PICKUP, new Pose2D(DistanceUnit.INCH, 54, -49, AngleUnit.DEGREES, 180)},
                     { POSE.PICKUP_TO_DROP_OFF_TRANSITION, new Pose2D(DistanceUnit.INCH, 32, -42, AngleUnit.DEGREES, 180)},
                     { POSE.PICKUP_TO_DROP_OFF_ROTATION, new Pose2D(DistanceUnit.INCH, 32, -42, AngleUnit.DEGREES, 0)},
-                    { POSE.PARK, new Pose2D(DistanceUnit.INCH, 70, -46, AngleUnit.DEGREES, 0)},
+                    { POSE.PARK, new Pose2D(DistanceUnit.INCH, 66, -50, AngleUnit.DEGREES, 0)},
 
                     // PUSH SPECIMENS
                     { POSE.WAYPOINT_ONE_SPECIMEN_ONE, new Pose2D(DistanceUnit.INCH, 42, -36, AngleUnit.DEGREES, 0)},

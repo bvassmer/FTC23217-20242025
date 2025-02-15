@@ -1,10 +1,5 @@
 package org.firstinspires.ftc.teamcode.core;
 
-import android.util.Log;
-
-import org.firstinspires.ftc.teamcode.Enum;
-import org.firstinspires.ftc.teamcode.library.LinearVelocity;
-
 public class ControllerCore extends ClawCore {
     public void runOpMode() throws InterruptedException {
         super.runOpMode();
@@ -20,8 +15,12 @@ public class ControllerCore extends ClawCore {
 
     private void runControllerOne() throws InterruptedException {
         boolean xButton = gamepad1.x;
+        boolean bButton = gamepad1.b;
         if (xButton) {
             slideState = SLIDE_STATE.HANGING;
+        }
+        if (bButton) {
+            movementLockOn = false;
         }
     }
 
@@ -33,7 +32,7 @@ public class ControllerCore extends ClawCore {
         boolean bButton = gamepad2.b;
 
         // Extension Arm manual movement.
-        if (y != 0.0) {
+        if (y != 0.0 && slideState != SLIDE_STATE.FIX_OUTSIDE_BOUNDARIES) {
             slideState = SLIDE_STATE.MANUAL_MOVING;
         }
 

@@ -17,6 +17,7 @@ import java.util.stream.Stream;
 
 
 public class AutoDriveCore extends MechamCore {
+    public boolean parkOnly = false;
 
     private Pose2D currentDestination;
     private double desiredMovementBearing;
@@ -247,117 +248,92 @@ public class AutoDriveCore extends MechamCore {
         return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
     }
 
+    // Function to break speed into x and y components from bearing
     public void calculateSpeedComponents(double slowDistance, double maxSpeed) throws InterruptedException {
-        double MIN_SPEED = 0.23;
+        // Convert bearing from degrees to radians
+        double radians = Math.toRadians(desiredMovementBearing);
+        double robotHeading = odo.getHeading(); // Get robot's current heading - radians
+        double MIN_SPEED = 0.17;
+        double MIN_DISTANCE = 0;
+        double MAX_DISTANCE = 100;
 
-        // Get current position from odometry
-        Pose2D currentPose = odo.getPosition();
-        double x1 = currentPose.getX(DistanceUnit.INCH);
-        double y1 = currentPose.getY(DistanceUnit.INCH);
-        double heading = currentPose.getHeading(AngleUnit.RADIANS); // Convert heading to radians
 
-        // Get target position
+        // Adjust bearing relative to the robot's heading
+        double adjustedRadians = radians - robotHeading;
+
+        double x1 = odo.getPosition().getX(DistanceUnit.INCH);
+        double y1 = odo.getPosition().getY(DistanceUnit.INCH);
         double x2 = currentDestination.getX(DistanceUnit.INCH);
         double y2 = currentDestination.getY(DistanceUnit.INCH);
 
-        // Compute distance to target
+        // Calculate the Euclidean distance to the destination
         double distance = getDistanceToTarget(x1, y1, x2, y2);
 
-        // Adjust speed based on distance
+        // Determine speed based on distance
         double desiredSpeed;
         if (distance > slowDistance) {
-            desiredSpeed = maxSpeed;
+            desiredSpeed = maxSpeed;  // Move at max speed when far away
         } else {
-            double progress = distance / slowDistance;
-            double smoothProgress = 0.5 * (1 - Math.cos(progress * Math.PI));
+            // Smoothly reduce speed using an S-curve when within SLOW_DISTANCE
+            double progress = distance / slowDistance;  // Normalize distance to [0,1]
+            // Use a different easing function (e.g., (progress)^2 for more aggressive deceleration)
+            double smoothProgress = 0.5 * (1 - Math.cos(progress * Math.PI)); // Ease-out function
             desiredSpeed = MIN_SPEED + smoothProgress * (maxSpeed - MIN_SPEED);
         }
 
-        // Reduce speed if rotation is strong
-        /* double rotationFactor = Math.max(0.3, 1.0 - Math.abs(desiredRxPower) * 2.0);
-        desiredSpeed *= rotationFactor; */
-        double rotationFactor = Math.max(0.5, 1.0 - Math.abs(desiredRxPower) * 1.5); // ✅ Less aggressive reduction
-        desiredSpeed *= rotationFactor;
+        // Calculate x and y components of speed
+        double xSpeed = desiredSpeed * Math.sin(adjustedRadians);  // x component (horizontal speed)
+        double ySpeed = desiredSpeed * Math.cos(adjustedRadians);  // y component (vertical speed)
 
-        // Compute absolute movement direction (from current to destination)
-        double movementAngle = Math.atan2(y2 - y1, x2 - x1); // Field-centric angle
+        Log.d("FTC-23217-AutoDriveCore", "calculateSpeedComponents: desiredSpeed:" + desiredSpeed + " xSpeed:" + xSpeed + " ySpeed:" + ySpeed);
 
-        // Convert to robot-centric using current heading
-        double relativeAngle = movementAngle - heading; // Adjust for robot frame
-
-        // ✅ FIX: Swap sin and cos to correctly map motion
-        double xSpeed = desiredSpeed * Math.cos(relativeAngle); // Cos for x (strafe)
-        double ySpeed = desiredSpeed * Math.sin(relativeAngle); // Sin for y (forward/backward)
-
+        // Return the components as an array: [x, y]
         desiredXPower = xSpeed;
         desiredYPower = ySpeed;
-
-        Log.d("FTC-23217-AutoDriveCore", "Speed: " + desiredSpeed + " xSpeed:" + xSpeed + " ySpeed:" + ySpeed + " rotationFactor:" + rotationFactor);
     }
 
     private void calculateAngularMovement() throws InterruptedException {
         double currentAngularBearing = Math.toDegrees(odo.getHeading());
         double currentDesiredAngularBearing = currentDestination.getHeading(AngleUnit.DEGREES);
 
-        // Get current position from odometry
-        Pose2D currentPose = odo.getPosition();
-        double x1 = currentPose.getX(DistanceUnit.INCH);
-        double y1 = currentPose.getY(DistanceUnit.INCH);
-
-        // Get target position
-        double x2 = currentDestination.getX(DistanceUnit.INCH);
-        double y2 = currentDestination.getY(DistanceUnit.INCH);
-
-        // Compute distance to target
-        double distanceToTarget = getDistanceToTarget(x1, y1, x2, y2);
-
-        Log.d("FTC-23217-AutoDriveCore-calculateAngularMovement",
-                "Pre-Normalized currentAngularBearing=" + currentAngularBearing +
-                        " currentDesiredAngularBearing:" + currentDesiredAngularBearing);
-
-        // Normalize angles
+        // Normalize the angles to be within [0, 360)
         currentAngularBearing = (currentAngularBearing + 360) % 360;
         currentDesiredAngularBearing = (currentDesiredAngularBearing + 360) % 360;
 
-        // Calculate error
-        double error = currentDesiredAngularBearing - currentAngularBearing;
+        // Calculate the difference in angles
+        double delta = currentDesiredAngularBearing - currentAngularBearing;
 
-        // Normalize error to range [-180, 180]
-        if (error > 180) error -= 360;
-        if (error < -180) error += 360;
-
-        double WINDUP_GUARD = 10.0;
-        // **Fix 1: Integral Windup Guard** (Limit accumulation to prevent excessive rotation)
-        if (Math.abs(error) > WINDUP_GUARD) { // Only accumulate if error is reasonable
-            integralSum = 0;
-        } else {
-            integralSum += error;
+        // Normalize the difference to the range [-180, 180]
+        if (delta > 180) {
+            delta -= 360;
+        } else if (delta < -180) {
+            delta += 360;
         }
 
-        // **Fix 2: Adjust Rotation Scaling for Long Movements**
-        double distanceFactor = Math.min(1.0, distanceToTarget / 10.0); // Scale for long movements // changed from 20
-        double adjustedKP = kP * distanceFactor; // Reduce P effect for long distances
+        // Define turning parameters
+        double MAX_TURN_SPEED = 0.6;   // Maximum turn speed
+        double MIN_TURN_SPEED = 0.2;  // Minimum turn speed (to prevent jitter)
+        double SLOW_ANGLE = 40;        // Start slowing down when within this angle
 
-        // Compute PID output
-        double derivative = error - previousError;
-        previousError = error;
-        double rxPower = (adjustedKP * error) + (kI * integralSum) + (kD * derivative);
+        // Normalize progress: 1 when far, 0 when close
+        double progress = Math.min(1.0, Math.abs(delta) / SLOW_ANGLE);
 
-        // **Fix 3: Smoothly Reduce Rotation Near Target**
-        double closeToTargetFactor = Math.max(0.2, Math.min(1.0, Math.abs(error) / WINDUP_GUARD));
-        rxPower *= closeToTargetFactor;
+        // Apply cosine easing for smooth deceleration
+        double smoothProgress = 0.5 * (1 - Math.cos(progress * Math.PI));
 
-        // Clamp rxPower
-        rxPower = Math.max(-maxTurnSpeed, Math.min(maxTurnSpeed, rxPower));
+        // Compute desired turn speed
+        double rxPower = MIN_TURN_SPEED + smoothProgress * (MAX_TURN_SPEED - MIN_TURN_SPEED);
 
-        if (Math.abs(rxPower) < 0.05) {
+        // Apply direction
+        rxPower *= Math.signum(delta);  // Maintain correct left/right turn direction
+
+        // If the angle difference is very small, stop turning
+        if (Math.abs(delta) < 0.5) {
             rxPower = 0.0;
         }
+        desiredRxPower = rxPower *-1;
 
-        desiredRxPower = rxPower;
-
-        Log.d("FTC-23217-AutoDriveCore-calculateAngularMovement",
-                "PID Rotation: error=" + error + " rxPower=" + rxPower);
+        Log.d("FTC-23217-AutoDriveCore", "calculateAngularMovement: delta:" + delta + " desiredRxPower:" + desiredRxPower);
     }
 
 
@@ -555,8 +531,8 @@ public class AutoDriveCore extends MechamCore {
             StepState.DROPOFF,
             StepState.PICKUP,
             StepState.MOVE_TO_DROPOFF,
-            StepState.DROPOFF,
-            StepState.PARK, */
+            StepState.DROPOFF, */
+            StepState.PARK,
             StepState.STOP,
     };
     public enum StepState {
@@ -587,6 +563,7 @@ public class AutoDriveCore extends MechamCore {
         PICKUP_TURN, // Reset out of the park zone and line up with pickup location. turn around. PICKUP should be after this.
         DONE,
     }
+
 
     private void stepStateMachine() throws InterruptedException {
         switch (stepState) {
@@ -652,11 +629,16 @@ public class AutoDriveCore extends MechamCore {
                         break;
                 }
                 rotationLiftState = RotationLiftState.PARK;
+                if (!parkOnly) {
+                    slideState = SLIDE_STATE.AUTO_PICKUP;
+                    clawState = ClawState.CLOSE;
+                }
                 if (atDestination()) {
                     autoDriveState = AutoDriveState.STOP;
                 } else {
                     calculateMovements(true, true, false, 20, 0.8);
                 }
+
                 break;
             case TESTING:
                 currentDestination = MAP_BLUE_POSE.get(POSE.TEST_TURN);
@@ -683,7 +665,6 @@ public class AutoDriveCore extends MechamCore {
         MOVE_TO_DROPOFF_ALIGNMENT,
         MOVE_TO_DROPOFF,
         DONE,
-
     }
     private void moveToDropoffStateMachine() throws InterruptedException {
        switch (moveToDropoffState) {
@@ -876,7 +857,7 @@ public class AutoDriveCore extends MechamCore {
     }
     public PickupState pickupState = PickupState.MOVE_TO_WALL;
     private ElapsedTime pickupClawTimer = new ElapsedTime();
-    private final double PICKUP_CLAW_DELAY = 0.4;
+    private final double PICKUP_CLAW_DELAY = 0.3;
 
 
     private void pickupStateMachine() throws InterruptedException {
@@ -909,6 +890,5 @@ public class AutoDriveCore extends MechamCore {
             case STOP:
                 break;
         }
-
     }
 }

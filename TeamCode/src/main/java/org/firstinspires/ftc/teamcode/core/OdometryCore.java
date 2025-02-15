@@ -106,24 +106,49 @@ public class OdometryCore extends DataCore {
         sleep(500);
         odo.update();
 
-        if (Boolean.TRUE.equals(this.MAP_DEBUG.get(DebugEnum.TESTING))) {
-            switch (teamColor) {
-                case BLUE:
-                    odo.setPosition(Objects.requireNonNull(MAP_BLUE_POSE.get(POSE.TEST_START)));
-                    break;
-                case RED:
-                    odo.setPosition(Objects.requireNonNull(MAP_RED_POSE.get(POSE.TEST_START)));
-                    break;
-            }
-        } else {
-            switch (teamColor) {
-                case BLUE:
-                    odo.setPosition(Objects.requireNonNull(MAP_BLUE_POSE.get(POSE.START)));
-                    break;
-                case RED:
-                    odo.setPosition(Objects.requireNonNull(MAP_RED_POSE.get(POSE.START)));
-                    break;
-            }
+        switch (courseSide) {
+            case RIGHT:
+                if (Boolean.TRUE.equals(this.MAP_DEBUG.get(DebugEnum.TESTING))) {
+                    switch (teamColor) {
+                        case BLUE:
+                            odo.setPosition(Objects.requireNonNull(MAP_BLUE_POSE.get(POSE.TEST_START)));
+                            break;
+                        case RED:
+                            odo.setPosition(Objects.requireNonNull(MAP_RED_POSE.get(POSE.TEST_START)));
+                            break;
+                    }
+                } else {
+                    switch (teamColor) {
+                        case BLUE:
+                            odo.setPosition(Objects.requireNonNull(MAP_BLUE_POSE.get(POSE.START)));
+                            break;
+                        case RED:
+                            odo.setPosition(Objects.requireNonNull(MAP_RED_POSE.get(POSE.START)));
+                            break;
+                    }
+                }
+                break;
+            case LEFT:
+                if (Boolean.TRUE.equals(this.MAP_DEBUG.get(DebugEnum.TESTING))) {
+                    switch (teamColor) {
+                        case BLUE:
+                            odo.setPosition(Objects.requireNonNull(MAP_BLUE_LEFT_POSE.get(POSE.TEST_START)));
+                            break;
+                        case RED:
+                            odo.setPosition(Objects.requireNonNull(MAP_RED_LEFT_POSE.get(POSE.TEST_START)));
+                            break;
+                    }
+                } else {
+                    switch (teamColor) {
+                        case BLUE:
+                            odo.setPosition(Objects.requireNonNull(MAP_BLUE_LEFT_POSE.get(POSE.START)));
+                            break;
+                        case RED:
+                            odo.setPosition(Objects.requireNonNull(MAP_RED_LEFT_POSE.get(POSE.START)));
+                            break;
+                    }
+                }
+                break;
         }
     }
 

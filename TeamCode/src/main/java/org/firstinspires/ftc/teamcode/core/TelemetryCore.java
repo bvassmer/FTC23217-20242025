@@ -25,6 +25,7 @@ public class TelemetryCore extends ControllerCore {
         telemetry.addData("clawServoState", clawPivotState);
         telemetry.addData("webcamServoPosition", webcamServoPosition);
         telemetry.addData("Lift Pivot State", rotationLiftState);
+        telemetry.addData("Slide State", slideState);
         telemetry.addData("Is Claw Touching?", isClawTouching);
         telemetry.addData("Auto mode", this.autonomousMode);
         telemetry.addData("Enable Controller", this.enableController);
