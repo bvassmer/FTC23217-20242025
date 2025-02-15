@@ -113,7 +113,7 @@ public class DataCore extends HardwareCore {
 
     protected final Map<POSE, Pose2D> MAP_BLUE_LEFT_POSE = Stream.of(new Object[][] {
             { POSE.START, new Pose2D(DistanceUnit.INCH, 21.25, 56, AngleUnit.DEGREES, 270)},
-       /*     { POSE.TO_BASKET, new Pose2D(DistanceUnit.INCH, 42, 49, AngleUnit.DEGREES, 270)},
+            /* { POSE.TO_BASKET, new Pose2D(DistanceUnit.INCH, 42, 49, AngleUnit.DEGREES, 270)},
             { POSE.BASKET_TURN, new Pose2D(DistanceUnit.INCH, 42, 49, AngleUnit.DEGREES, 225)},
 
 

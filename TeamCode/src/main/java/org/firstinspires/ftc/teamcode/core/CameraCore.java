@@ -146,8 +146,8 @@ public class CameraCore extends SensorCore {
         super.runOpMode();
         searchCount = 0;
         if (autonomousMode) {
-            initVision();
-            while (!aprilTagDetected()) {
+            // initVision();
+            /*while (!aprilTagDetected()) {
                 searchStateMachine();
                 updateTelemetry(true);
                 searchCount += 1;
@@ -168,24 +168,24 @@ public class CameraCore extends SensorCore {
                 if (searchCount > INIT_APRIL_TAG_SEARCH_COUNT_MAX) {
                     break;
                 }
-            }
+            } */
             // centerWebcamOnAprilTag();
             // odo.resetPosAndIMU();
             // odo.setPosition(new Pose2D(DistanceUnit.INCH, cameraPoses.getAverageX(), cameraPoses.getAverageY(), AngleUnit.DEGREES, startAngle));
-            updateTelemetry(true);
+            // updateTelemetry(true);
             searchState = SearchState.WAITING_FOR_START;
         }
     }
 
     protected void workers() throws InterruptedException {
         super.workers();
-        if (
+        /* if (
                 autonomousMode
                 && Boolean.TRUE.equals(MAP_COMPONENT.get(ComponentEnum.CAMERA))
         ) {
             searchStateMachine();
             updateTelemetry(false);
-        }
+        } */
     }
 
     public void initVision() throws InterruptedException {
